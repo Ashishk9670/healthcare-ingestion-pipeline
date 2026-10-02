@@ -1,0 +1,42 @@
+{
+  "realm": "healthcare",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "accessTokenLifespan": 900,
+  "roles": {
+    "realm": [
+      { "name": "INGESTOR",  "description": "May submit HL7/FHIR messages" },
+      { "name": "CLINICIAN", "description": "May view patient detail and cohorts" },
+      { "name": "ANALYST",   "description": "May view de-identified cohort aggregates" },
+      { "name": "AUDITOR",   "description": "May read the audit log" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "pipeline-client",
+      "name": "Pipeline dashboard and API client (DEV ONLY)",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost:8080/*", "http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:8080", "http://localhost:3000"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:8080/*"
+      },
+      "defaultClientScopes": ["web-origins", "roles", "profile", "email"]
+    }
+  ],
+  "users": [
+    { "username": "ingestor1",  "enabled": true, "emailVerified": true, "email": "ingestor1@example.test",  "firstName": "Ingest", "lastName": "Or",
+      "credentials": [{ "type": "password", "value": "ingestor1-dev", "temporary": false }], "realmRoles": ["INGESTOR"] },
+    { "username": "clinician1", "enabled": true, "emailVerified": true, "email": "clinician1@example.test", "firstName": "Clini", "lastName": "Cian",
+      "credentials": [{ "type": "password", "value": "clinician1-dev", "temporary": false }], "realmRoles": ["CLINICIAN"] },
+    { "username": "analyst1",   "enabled": true, "emailVerified": true, "email": "analyst1@example.test",   "firstName": "Ana", "lastName": "Lyst",
+      "credentials": [{ "type": "password", "value": "analyst1-dev", "temporary": false }], "realmRoles": ["ANALYST"] },
+    { "username": "auditor1",   "enabled": true, "emailVerified": true, "email": "auditor1@example.test",   "firstName": "Audi", "lastName": "Tor",
+      "credentials": [{ "type": "password", "value": "auditor1-dev", "temporary": false }], "realmRoles": ["AUDITOR"] }
+  ]
+}

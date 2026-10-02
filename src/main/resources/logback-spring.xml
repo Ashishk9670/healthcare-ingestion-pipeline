@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <conversionRule conversionWord="mask" converterClass="com.example.hdip.logging.PhiMaskingConverter"/>
+  <conversionRule conversionWord="maskEx" converterClass="com.example.hdip.logging.PhiMaskingThrowableConverter"/>
+
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <!-- every message passes through PHI masking; exception text is masked too -->
+      <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %mask%n%maskEx{short}</pattern>
+    </encoder>
+  </appender>
+
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+</configuration>

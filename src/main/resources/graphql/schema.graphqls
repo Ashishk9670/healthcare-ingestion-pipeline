@@ -1,0 +1,61 @@
+type Query {
+    "Patient detail by MRN (CLINICIAN only)"
+    patient(mrn: String!): Patient
+    "De-identified cohort aggregates (CLINICIAN, ANALYST)"
+    cohort(filter: CohortFilter, limit: Int): CohortSummary!
+    "Most recent audit entries (AUDITOR only)"
+    auditLog(limit: Int): [AuditEntry!]!
+}
+
+input CohortFilter {
+    "ICD-10 code or prefix, e.g. E11 or E11.9"
+    diagnosisCode: String
+    "One of 0-17, 18-34, 35-49, 50-64, 65-79, 80+"
+    ageBand: String
+    gender: String
+}
+
+type Patient {
+    mrn: String
+    familyName: String
+    givenName: String
+    birthDate: String
+    gender: String
+    ageBand: String
+    diagnoses: [Diagnosis!]!
+    observations: [Observation!]!
+}
+
+type Diagnosis { code: String system: String display: String }
+
+type Observation {
+    code: String
+    display: String
+    valueText: String
+    valueNumeric: Float
+    unit: String
+    effectiveAt: String
+}
+
+type CohortSummary {
+    totalPatients: Int!
+    byAgeBand: [Bucket!]!
+    byGender: [Bucket!]!
+    byDiagnosis: [Bucket!]!
+    members: [CohortMember!]!
+}
+
+type Bucket { key: String! count: Int! }
+
+type CohortMember { patientRef: String! ageBand: String! gender: String! diagnosisCodes: [String!]! }
+
+type AuditEntry {
+    id: String!
+    timestamp: String!
+    actor: String!
+    roles: String
+    action: String!
+    resourceType: String
+    resourceId: String
+    detail: String
+}

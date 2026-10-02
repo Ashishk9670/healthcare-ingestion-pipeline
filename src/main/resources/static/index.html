@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cohort Dashboard (synthetic data)</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <h1>Cohort Dashboard</h1>
+  <span class="banner">SYNTHETIC DATA ONLY</span>
+  <div class="auth">
+    <span id="user" data-testid="user"></span>
+    <button id="login" data-testid="login">Sign in</button>
+    <button id="logout" data-testid="logout" hidden>Sign out</button>
+  </div>
+</header>
+
+<main id="app" hidden>
+  <section id="ingest-panel" data-role="INGESTOR" hidden>
+    <h2>Ingestion</h2>
+    <label>Synthetic patients <input id="syn-count" type="number" min="1" max="500" value="10"></label>
+    <button id="syn-go" data-testid="syn-go">Generate &amp; ingest</button>
+    <span id="syn-status" data-testid="syn-status"></span>
+  </section>
+
+  <section id="cohort-panel" data-role="CLINICIAN,ANALYST" hidden>
+    <h2>Cohort</h2>
+    <form id="cohort-form">
+      <label>Diagnosis (ICD-10 prefix) <input id="f-dx" placeholder="E11"></label>
+      <label>Age band
+        <select id="f-age"><option value="">any</option><option>0-17</option><option>18-34</option><option>35-49</option>
+          <option>50-64</option><option>65-79</option><option>80+</option></select></label>
+      <label>Gender
+        <select id="f-gender"><option value="">any</option><option>female</option><option>male</option></select></label>
+      <button type="submit" data-testid="cohort-run">Run</button>
+    </form>
+    <p>Total patients: <strong id="total" data-testid="total">-</strong></p>
+    <div class="grid">
+      <div><h3>By age band</h3><table id="t-age" data-testid="t-age"></table></div>
+      <div><h3>By gender</h3><table id="t-gender"></table></div>
+      <div><h3>By diagnosis</h3><table id="t-dx" data-testid="t-dx"></table></div>
+    </div>
+  </section>
+
+  <section id="patient-panel" data-role="CLINICIAN" hidden>
+    <h2>Patient lookup</h2>
+    <form id="patient-form"><label>MRN <input id="p-mrn" placeholder="SYN-123456"></label>
+      <button type="submit" data-testid="patient-run">Find</button></form>
+    <pre id="patient-out" data-testid="patient-out"></pre>
+  </section>
+
+  <section id="audit-panel" data-role="AUDITOR" hidden>
+    <h2>Audit log</h2>
+    <button id="audit-go" data-testid="audit-go">Refresh</button>
+    <table id="t-audit" data-testid="t-audit"></table>
+  </section>
+
+  <p id="error" role="alert" data-testid="error"></p>
+</main>
+<script src="/config.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
