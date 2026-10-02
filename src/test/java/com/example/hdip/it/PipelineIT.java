@@ -7,6 +7,8 @@ import com.example.hdip.store.PatientRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.util.List;
@@ -21,6 +23,7 @@ class PipelineIT extends AbstractIntegrationTest {
     @Autowired AesGcmFieldCipher cipher;
     @Autowired JdbcTemplate jdbc;
     @Autowired AuditService audit;
+    @Autowired PlatformTransactionManager txManager;
 
     private static String hl7(String mrn) {
         return String.join("\r",
@@ -49,11 +52,14 @@ class PipelineIT extends AbstractIntegrationTest {
         String hash = cipher.hmac(mrn);
         await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> assertThat(patients.findByMrnHash(hash)).isPresent());
 
-        var p = patients.findByMrnHash(hash).orElseThrow();
-        assertThat(p.getFamilyName()).isEqualTo("Testerson"); // decrypted through the JPA converter
-        assertThat(p.getAgeBand()).isNotBlank();               // enrichment ran
-        assertThat(p.getDiagnoses()).extracting("code").contains("E11.9");
-        assertThat(p.getDiagnoses().get(0).getDisplay()).isNotBlank();
+        // lazy collections need an open session
+        new TransactionTemplate(txManager).executeWithoutResult(st -> {
+            var p = patients.findByMrnHash(hash).orElseThrow();
+            assertThat(p.getFamilyName()).isEqualTo("Testerson"); // decrypted through the JPA converter
+            assertThat(p.getAgeBand()).isNotBlank();               // enrichment ran
+            assertThat(p.getDiagnoses()).extracting("code").contains("E11.9");
+            assertThat(p.getDiagnoses().get(0).getDisplay()).isNotBlank();
+        });
 
         // raw column contents must not contain plaintext PHI
         List<String> cols = jdbc.queryForList("select family_name_enc || mrn_enc || ssn_enc from patient where mrn_hash = ?", String.class, hash);

@@ -31,13 +31,18 @@
     });
     const res = await fetch(`${base}/token`, { method: "POST", body });
     if (!res.ok) { showError("Token exchange failed"); return; }
-    store.setItem("access_token", (await res.json()).access_token);
+    const tok = await res.json();
+    store.setItem("access_token", tok.access_token);
+    if (tok.id_token) store.setItem("id_token", tok.id_token);
     history.replaceState({}, "", "/");
   }
 
   function logout() {
+    const idToken = store.getItem("id_token");
     store.clear();
-    window.location.assign(`${base}/logout?client_id=${cfg.clientId}&post_logout_redirect_uri=${encodeURIComponent(redirectUri)}`);
+    // id_token_hint lets Keycloak skip its "Do you want to log out?" confirmation page
+    const hint = idToken ? `&id_token_hint=${encodeURIComponent(idToken)}` : "";
+    window.location.assign(`${base}/logout?client_id=${cfg.clientId}&post_logout_redirect_uri=${encodeURIComponent(redirectUri)}${hint}`);
   }
 
   const token = () => store.getItem("access_token");
