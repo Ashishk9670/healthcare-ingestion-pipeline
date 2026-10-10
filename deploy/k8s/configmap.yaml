@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hdip-config
+  namespace: hdip
+data:
+  DB_URL: jdbc:postgresql://postgres.hdip.svc:5432/hdip
+  DB_USER: hdip
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka.hdip.svc:9092
+  KEYCLOAK_ISSUER: https://keycloak.example.test/realms/healthcare
+  KEYCLOAK_JWK_SET_URI: http://keycloak.hdip.svc:8080/realms/healthcare/protocol/openid-connect/certs
+  MANAGEMENT_PORT: "8081"
+  OTEL_TRACING_SAMPLING: "0.0"
+  INGEST_RATE_LIMIT_RPM: "600"
+  INGEST_RATE_LIMIT_BURST: "100"

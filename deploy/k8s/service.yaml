@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: hdip
+  namespace: hdip
+  labels: { app.kubernetes.io/name: hdip }
+spec:
+  selector: { app.kubernetes.io/name: hdip }
+  ports:
+    # only the API port is exposed; the management port (8081) is reachable by pod IP for probes and Prometheus
+    - { name: http, port: 80, targetPort: http }

@@ -119,3 +119,14 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Verify non-root user
         run: test "$(docker run --rm --entrypoint id hdip/healthcare-ingestion-pipeline:ci -u)" != "0"
+
+  k8s-manifests:
+    name: Kubernetes manifests (kubeconform)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate manifests against the Kubernetes schemas
+        run: |
+          docker run --rm -v "$PWD/deploy/k8s:/manifests:ro" ghcr.io/yannh/kubeconform:v0.6.7 \
+            -strict -summary -kubernetes-version 1.30.0 \
+            -ignore-filename-pattern 'kustomization\.yaml' /manifests

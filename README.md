@@ -1,15 +1,36 @@
 # Healthcare Data Ingestion Pipeline
 
+[![CI](https://github.com/Ashishk9670/healthcare-ingestion-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/Ashishk9670/healthcare-ingestion-pipeline/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/Ashishk9670/healthcare-ingestion-pipeline/actions/workflows/codeql.yml/badge.svg)](https://github.com/Ashishk9670/healthcare-ingestion-pipeline/actions/workflows/codeql.yml)
+[![Trivy](https://github.com/Ashishk9670/healthcare-ingestion-pipeline/actions/workflows/trivy.yml/badge.svg)](https://github.com/Ashishk9670/healthcare-ingestion-pipeline/actions/workflows/trivy.yml)
+![Java 21](https://img.shields.io/badge/Java-21-blue) ![Spring Boot 3.5](https://img.shields.io/badge/Spring%20Boot-3.5-brightgreen) ![Synthetic data only](https://img.shields.io/badge/data-synthetic%20only-orange)
+
 > **SYNTHETIC DATA ONLY.** This project is a reference/demo implementation. Never load real PHI into it.
 > All sample data comes from the built-in synthetic generator (`SyntheticDataGenerator`): invented names,
-> `SYN-` MRNs, SSNs from the never-issued 9xx range. The dev encryption keys and Keycloak users in this
-> repo are public placeholders, not secrets.
+> `SYN-` MRNs, SSNs from the never-issued 9xx range. No secrets are committed: dev passwords and
+> encryption keys are generated locally into a git-ignored `.env`.
 
 Spring Boot 3.5 / Java 21 / Maven. Ingests HL7 v2 and FHIR-like JSON, runs it through three Kafka stages,
 stores it encrypted in PostgreSQL and serves aggregated patient/cohort views over GraphQL, with audit logging,
 RBAC (Keycloak) and PHI-masked logs.
 
 ## Architecture
+
+```mermaid
+flowchart LR
+  C[Client / k6] -->|"HL7 v2 / FHIR JSON + JWT"| G["IngestGuardFilter<br/>rate limit + size limit"]
+  G --> I[IngestionService]
+  I --> R[(phi.raw)]
+  R -->|Normalize| N[(phi.normalized)]
+  N -->|Enrich| E[(phi.enriched)]
+  E -->|Persist| P[(PostgreSQL<br/>AES-GCM columns + audit)]
+  Q[GraphQL / Dashboard] -->|"RBAC (Keycloak JWT)"| P
+  K[Keycloak] -. JWKS .-> G
+  I -. metrics/traces .-> M["Actuator :8081<br/>Prometheus, OTLP"]
+  M --> Gr[Grafana / Jaeger]
+```
+
+Plain-text view:
 
 ```
  HL7 v2 / FHIR JSON                    +-------------------------------------------+
@@ -68,6 +89,12 @@ password grant for tests/scripts).
 - Kafka payloads carry PHI in clear JSON; production would need TLS + encryption/ACLs on the brokers.
 - Logs: all messages and exception text pass through `PhiMasker` (SSN pattern, name/DOB/MRN key-value pairs,
   HL7 `PID|` segments, `MRN-`/`SYN-` tokens). Payloads are never logged deliberately. Masking is best-effort.
+- Secrets: nothing committed; keys and passwords come from env / secret manager (`.env` locally, Kubernetes Secret in
+  `deploy/k8s`). Container runs as non-root with a read-only root filesystem; actuator is on a non-public port.
+- Observability is PHI-safe by construction: metric tags are fixed enums and span attributes are masked.
+- Supply chain: Dependabot, CodeQL, Trivy (repo + image), JaCoCo threshold, Spotless.
+- Not covered here (needed for real PHI): TLS everywhere, Kafka/DB encryption at rest and ACLs, KMS-managed keys with
+  automated re-encryption, BAAs, retention/disposal policies, formal risk assessment.
 - This is not a certified HIPAA implementation.
 
 ## Run it
@@ -120,6 +147,12 @@ Or open http://localhost:8080/ and sign in (cohort dashboard; panels depend on r
 - `docker compose --profile observability up -d` adds Prometheus :9090, Grafana :3000 (admin password
   `GRAFANA_ADMIN_PASSWORD` from `.env`, provisioned dashboard "HDIP pipeline") and Jaeger :16686.
 - `docker compose --profile app up -d --build` runs the app itself from the multi-stage, non-root `Dockerfile`.
+
+## Kubernetes and releases
+
+- `deploy/k8s/` holds hardened manifests (kustomize); CI validates them with kubeconform. See `deploy/k8s/README.md`.
+- Pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml` and publishes `ghcr.io/ashishk9670/healthcare-ingestion-pipeline`.
+- Load test: `loadtest/` (k6).
 
 ## Tests
 
