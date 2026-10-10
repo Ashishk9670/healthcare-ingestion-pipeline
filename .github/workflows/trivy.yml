@@ -1,0 +1,42 @@
+name: Trivy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '41 4 * * 1'
+
+jobs:
+  scan:
+    name: Trivy (repo + image)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Filesystem scan (dependencies, secrets, IaC misconfig)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+          skip-dirs: e2e/node_modules,target
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: hdip/healthcare-ingestion-pipeline:scan
+          cache-from: type=gha
+      - name: Image scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: hdip/healthcare-ingestion-pipeline:scan
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'

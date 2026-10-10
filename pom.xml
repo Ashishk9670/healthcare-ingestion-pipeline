@@ -19,6 +19,7 @@
   <properties>
     <java.version>21</java.version>
     <jacoco.version>0.8.15</jacoco.version>
+    <jacoco.minimum>0.70</jacoco.minimum>
     <testcontainers.version>1.21.3</testcontainers.version>
     <!-- Lets Mockito/ByteBuddy run on newer JDKs than the one it was built against -->
     <test.argLine>-Dnet.bytebuddy.experimental=true -XX:+EnableDynamicAgentLoading</test.argLine>
@@ -88,6 +89,22 @@
         </executions>
       </plugin>
 
+      <!-- Formatting hygiene: `mvn spotless:apply` fixes, `spotless:check` runs in CI -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>2.43.0</version>
+        <configuration>
+          <java>
+            <trimTrailingWhitespace/>
+            <endWithNewline/>
+          </java>
+        </configuration>
+        <executions>
+          <execution><id>spotless-check</id><phase>verify</phase><goals><goal>check</goal></goals></execution>
+        </executions>
+      </plugin>
+
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
@@ -97,6 +114,19 @@
           <execution><id>prepare-agent-it</id><goals><goal>prepare-agent-integration</goal></goals></execution>
           <execution>
             <id>report</id><phase>verify</phase><goals><goal>report</goal></goals>
+          </execution>
+          <execution>
+            <id>check</id><phase>verify</phase><goals><goal>check</goal></goals>
+            <configuration>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>${jacoco.minimum}</minimum></limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
           </execution>
           <execution>
             <id>report-it</id><phase>verify</phase><goals><goal>report-integration</goal></goals>

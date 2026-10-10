@@ -1,6 +1,7 @@
 package com.example.hdip.security;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -23,20 +24,26 @@ import java.util.List;
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity http, @Value("${management.server.port:-1}") int managementPort) throws Exception {
+    SecurityFilterChain filterChain(HttpSecurity http, @Value("${management.server.port:-1}") int managementPort,
+                                   @Value("${server.port:8080}") int serverPort) throws Exception {
         http
                 .cors(c -> c.configurationSource(corsConfigurationSource()))
                 .csrf(c -> c.disable()) // stateless bearer-token API
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(a -> a
-                        // Actuator (Prometheus, probes) is only open on the separate management port, which must not be exposed publicly
-                        .requestMatchers(r -> managementPort > 0 && r.getLocalPort() == managementPort && r.getRequestURI().startsWith("/actuator/")).permitAll()
+                .authorizeHttpRequests(a -> {
+                        // With a separate management port, actuator endpoints (Prometheus, probes) are not served on the public
+                        // port at all and are open on the management port, which must not be exposed publicly.
+                        if (managementPort > 0 && managementPort != serverPort) {
+                            a.requestMatchers(EndpointRequest.toAnyEndpoint()).permitAll();
+                        }
+                        a
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers("/", "/index.html", "/app.js", "/config.js", "/style.css", "/favicon.ico").permitAll() // static dashboard shell
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/v1/ingest/**", "/api/v1/synthetic/**").hasRole("INGESTOR")
                         .requestMatchers("/graphql").authenticated() // field-level rules via @PreAuthorize
-                        .anyRequest().denyAll())
+                        .anyRequest().denyAll();
+                })
                 .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(jwtAuthenticationConverter())));
         return http.build();
     }
