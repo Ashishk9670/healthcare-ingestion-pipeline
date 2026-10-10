@@ -1,7 +1,6 @@
 package com.example.hdip.security;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -34,7 +33,7 @@ public class SecurityConfig {
                         // With a separate management port, actuator endpoints (Prometheus, probes) are not served on the public
                         // port at all and are open on the management port, which must not be exposed publicly.
                         if (managementPort > 0 && managementPort != serverPort) {
-                            a.requestMatchers(EndpointRequest.toAnyEndpoint()).permitAll();
+                            a.requestMatchers("/actuator/prometheus").permitAll();
                         }
                         a
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()

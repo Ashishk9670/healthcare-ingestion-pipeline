@@ -1,0 +1,4 @@
+# Spring Framework 6.2.x is at its latest release (6.2.19); these are fixed only in 7.x (Spring Boot 4).
+# Tracked via Dependabot (Boot 4 bump PR). Revisit on every Boot upgrade.
+CVE-2026-47884
+CVE-2026-47890

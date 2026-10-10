@@ -10,6 +10,8 @@ on:
 jobs:
   analyze:
     name: CodeQL (java)
+    # Code scanning upload needs GitHub Advanced Security on private repos; enable it and remove this guard to run here.
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     permissions:
       security-events: write

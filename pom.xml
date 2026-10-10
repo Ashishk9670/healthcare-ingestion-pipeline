@@ -20,11 +20,20 @@
     <java.version>21</java.version>
     <jacoco.version>0.8.15</jacoco.version>
     <postgresql.version>42.7.14</postgresql.version>
+    <!-- CVE overrides ahead of the Boot BOM (see Trivy workflow); drop when Boot catches up -->
+    <jackson-bom.version>2.21.7</jackson-bom.version>
+    <tomcat.version>10.1.60</tomcat.version>
     <jacoco.minimum>0.70</jacoco.minimum>
     <testcontainers.version>1.21.3</testcontainers.version>
     <!-- Lets Mockito/ByteBuddy run on newer JDKs than the one it was built against -->
     <test.argLine>-Dnet.bytebuddy.experimental=true -XX:+EnableDynamicAgentLoading</test.argLine>
   </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency><groupId>at.yawk.lz4</groupId><artifactId>lz4-java</artifactId><version>1.11.4</version></dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
