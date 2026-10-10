@@ -73,8 +73,16 @@ class ApiSecurityIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void healthEndpointIsPublic() {
-        assertThat(http("GET", "/actuator/health", null, null, null).status()).isEqualTo(200);
+    void actuatorOnlyOnManagementPort() throws Exception {
+        assertThat(mgmt("/actuator/health/readiness")).isEqualTo(200);
+        assertThat(mgmt("/actuator/prometheus")).isEqualTo(200);
+        // not reachable through the public API port
+        assertThat(http("GET", "/actuator/prometheus", null, null, null).status()).isIn(401, 404);
+    }
+
+    private int mgmt(String path) throws Exception {
+        var req = java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://localhost:" + MANAGEMENT_PORT + path)).GET().build();
+        return HTTP.send(req, java.net.http.HttpResponse.BodyHandlers.ofString()).statusCode();
     }
 
     // ---- GraphQL ----

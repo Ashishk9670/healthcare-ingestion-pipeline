@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: hdip
+    folder: HDIP
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

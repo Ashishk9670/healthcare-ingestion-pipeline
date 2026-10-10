@@ -109,6 +109,18 @@ curl -s -H "Authorization: Bearer $CLIN_TOKEN" -H 'Content-Type: application/jso
 
 Or open http://localhost:8080/ and sign in (cohort dashboard; panels depend on role).
 
+## Observability and container
+
+- Actuator runs on a separate management port (`MANAGEMENT_PORT`, default 8081; keep it off public networks):
+  `/actuator/health/{liveness,readiness}`, `/actuator/prometheus`. Custom metrics: `hdip_ingest_messages_total{format}`,
+  `hdip_ingest_rejected_total{reason}`, `hdip_pipeline_messages_total{stage,outcome}`,
+  `hdip_pipeline_stage_duration_seconds{stage,outcome}`. Tags are fixed enums only; no PHI, ids or user names.
+- Tracing (OpenTelemetry, OTLP/HTTP) is off by default: set `OTEL_TRACING_SAMPLING=0.1` and
+  `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`. A `PhiSafeObservationFilter` masks PHI-looking values in span attributes.
+- `docker compose --profile observability up -d` adds Prometheus :9090, Grafana :3000 (admin password
+  `GRAFANA_ADMIN_PASSWORD` from `.env`, provisioned dashboard "HDIP pipeline") and Jaeger :16686.
+- `docker compose --profile app up -d --build` runs the app itself from the multi-stage, non-root `Dockerfile`.
+
 ## Tests
 
 | Layer | What | Command | Needs Docker |

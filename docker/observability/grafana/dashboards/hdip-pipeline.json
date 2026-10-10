@@ -1,0 +1,28 @@
+{
+  "title": "HDIP pipeline (synthetic data)",
+  "uid": "hdip-pipeline",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    { "id": 1, "type": "timeseries", "title": "Ingested messages / s by format", "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "expr": "sum by (format) (rate(hdip_ingest_messages_total[1m]))", "legendFormat": "{{format}}" } ] },
+    { "id": 2, "type": "timeseries", "title": "Rejected ingests / s by reason", "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "expr": "sum by (reason) (rate(hdip_ingest_rejected_total[1m]))", "legendFormat": "{{reason}}" } ] },
+    { "id": 3, "type": "timeseries", "title": "Stage p95 latency (s)", "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "expr": "histogram_quantile(0.95, sum by (le, stage) (rate(hdip_pipeline_stage_duration_seconds_bucket[5m])))", "legendFormat": "{{stage}}" } ] },
+    { "id": 4, "type": "timeseries", "title": "Stage failures / s", "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "expr": "sum by (stage) (rate(hdip_pipeline_messages_total{outcome=\"failure\"}[1m]))", "legendFormat": "{{stage}}" } ] },
+    { "id": 5, "type": "timeseries", "title": "HTTP requests / s by status", "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "expr": "sum by (status) (rate(http_server_requests_seconds_count[1m]))", "legendFormat": "{{status}}" } ] },
+    { "id": 6, "type": "timeseries", "title": "JVM heap used", "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})", "legendFormat": "heap" } ] }
+  ]
+}
