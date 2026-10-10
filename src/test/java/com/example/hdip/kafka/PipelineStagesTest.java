@@ -5,6 +5,7 @@ import com.example.hdip.enrich.EnrichmentService;
 import com.example.hdip.model.CanonicalRecord;
 import com.example.hdip.model.EnrichedRecord;
 import com.example.hdip.model.RawMessage;
+import com.example.hdip.observability.PipelineMetrics;
 import com.example.hdip.parse.FhirJsonNormalizer;
 import com.example.hdip.parse.Hl7V2Parser;
 import com.example.hdip.parse.NormalizationService;
@@ -29,12 +30,13 @@ import static org.mockito.Mockito.verify;
 class PipelineStagesTest {
     @Mock KafkaTemplate<String, String> kafka;
     @Mock PatientStoreService store;
+    final io.micrometer.core.instrument.simple.SimpleMeterRegistry registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
     final ObjectMapper mapper = JsonMapper.builder().findAndAddModules().build();
 
     PipelineStages stages() {
         var norm = new NormalizationService(new Hl7V2Parser(), new FhirJsonNormalizer(mapper));
         var enrich = new EnrichmentService(new CodingLookup(), Clock.fixed(Instant.parse("2026-06-15T00:00:00Z"), java.time.ZoneOffset.UTC));
-        return new PipelineStages(mapper, kafka, norm, enrich, store);
+        return new PipelineStages(mapper, kafka, norm, enrich, store, new com.example.hdip.observability.PipelineMetrics(registry));
     }
 
     @Test
@@ -58,5 +60,20 @@ class PipelineStagesTest {
 
         stages.onEnriched(enr.getValue());
         verify(store).persist(org.mockito.ArgumentMatchers.any(EnrichedRecord.class));
+
+        // stage counters + latency timers recorded, with only low-cardinality tags
+        for (String stage : new String[]{"normalize", "enrich", "persist"}) {
+            assertThat(registry.get(PipelineMetrics.STAGE_COUNT).tag("stage", stage).tag("outcome", "success").counter().count()).isEqualTo(1.0);
+            assertThat(registry.get(PipelineMetrics.STAGE_DURATION).tag("stage", stage).timer().count()).isEqualTo(1L);
+        }
+    }
+
+    @Test
+    void failuresAreCountedAndRethrown() {
+        var stages = stages();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> stages.onRaw("not json")).isInstanceOf(Exception.class);
+        assertThat(registry.get(PipelineMetrics.STAGE_COUNT).tag("stage", "normalize").tag("outcome", "failure").counter().count()).isEqualTo(1.0);
+        // no meter tag value contains payload content
+        registry.getMeters().forEach(m -> m.getId().getTags().forEach(t -> assertThat(t.getValue()).doesNotContain("not json")));
     }
 }

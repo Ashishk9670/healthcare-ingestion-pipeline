@@ -41,9 +41,10 @@ class AesGcmFieldCipherTest {
 
     @Test
     void tamperedCiphertextRejected() {
-        byte[] raw = Base64.getDecoder().decode(cipher.encrypt("secret"));
+        String enc = cipher.encrypt("secret");
+        byte[] raw = Base64.getDecoder().decode(enc.substring(enc.indexOf(':') + 1));
         raw[raw.length - 1] ^= 1;
-        String tampered = Base64.getEncoder().encodeToString(raw);
+        String tampered = "k1:" + Base64.getEncoder().encodeToString(raw);
         assertThatThrownBy(() -> cipher.decrypt(tampered)).isInstanceOf(IllegalStateException.class);
     }
 
@@ -71,5 +72,59 @@ class AesGcmFieldCipherTest {
         String db = conv.convertToDatabaseColumn("abc");
         assertThat(db).isNotEqualTo("abc");
         assertThat(conv.convertToEntityAttribute(db)).isEqualTo("abc");
+    }
+
+    @Test
+    void ciphertextCarriesActiveKeyId() {
+        assertThat(cipher.encrypt("x")).startsWith("k1:");
+        assertThat(cipher.activeKeyId()).isEqualTo("k1");
+    }
+
+    @Test
+    void rotationOldDataStaysReadableAndNewDataUsesNewKey() {
+        String oldValue = cipher.encrypt("Testerson");
+        var rotated = new AesGcmFieldCipher(java.util.Map.of("k1", KEY, "k2", KEY2), "k2", HMAC);
+        assertThat(rotated.decrypt(oldValue)).isEqualTo("Testerson");
+        assertThat(rotated.needsRotation(oldValue)).isTrue();
+        String fresh = rotated.encrypt("Testerson");
+        assertThat(fresh).startsWith("k2:");
+        assertThat(rotated.needsRotation(fresh)).isFalse();
+        // once k1 is retired from the ring, old data is unreadable
+        var retired = new AesGcmFieldCipher(java.util.Map.of("k2", KEY2), "k2", HMAC);
+        assertThatThrownBy(() -> retired.decrypt(oldValue)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void legacyUnprefixedCiphertextDecryptsWithLegacyKey() throws Exception {
+        // value as written before key ids existed: base64(iv || ct || tag), no prefix
+        String legacy = cipher.encrypt("legacy").substring(3);
+        assertThat(cipher.decrypt(legacy)).isEqualTo("legacy");
+        assertThat(cipher.needsRotation(legacy)).isFalse(); // k1 is active here
+        var rotated = new AesGcmFieldCipher(java.util.Map.of("k1", KEY, "k2", KEY2), "k2", HMAC);
+        assertThat(rotated.needsRotation(legacy)).isTrue();
+    }
+
+    @Test
+    void activeKeyMustBeInRing() {
+        assertThatThrownBy(() -> new AesGcmFieldCipher(java.util.Map.of("k1", KEY), "k9", HMAC)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void parsesKeyRing() {
+        assertThat(AesGcmFieldCipher.parseKeyRing("k1:" + KEY + ", k2:" + KEY2)).containsOnlyKeys("k1", "k2").containsEntry("k2", KEY2);
+        assertThat(AesGcmFieldCipher.parseKeyRing("")).isEmpty();
+        assertThatThrownBy(() -> AesGcmFieldCipher.parseKeyRing("nocolon")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void cryptoConfigFailsFastWithoutKeys() {
+        var cfg = new CryptoConfig();
+        assertThatThrownBy(() -> cfg.aesGcmFieldCipher("", "", "", HMAC)).isInstanceOf(IllegalStateException.class).hasMessageContaining("PHI_ENCRYPTION_KEYS");
+        assertThatThrownBy(() -> cfg.aesGcmFieldCipher("k1:" + KEY, "", "", "")).isInstanceOf(IllegalStateException.class).hasMessageContaining("PHI_HMAC_KEY");
+        // active defaults to the last key in the ring
+        assertThat(cfg.aesGcmFieldCipher("k1:" + KEY + ",k2:" + KEY2, "", "", HMAC).activeKeyId()).isEqualTo("k2");
+        assertThat(cfg.aesGcmFieldCipher("k1:" + KEY + ",k2:" + KEY2, "", "k1", HMAC).activeKeyId()).isEqualTo("k1");
+        // legacy single-key variable still works
+        assertThat(cfg.aesGcmFieldCipher("", KEY, "", HMAC).activeKeyId()).isEqualTo("k1");
     }
 }

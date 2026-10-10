@@ -57,14 +57,21 @@ jobs:
         with: { distribution: temurin, java-version: '21', cache: maven }
       - uses: actions/setup-node@v4
         with: { node-version: '22', cache: npm, cache-dependency-path: e2e/package-lock.json }
+      - name: Generate random dev secrets
+        run: |
+          scripts/gen-dev-env.sh
+          # make every secret available to later steps (masked) without committing anything
+          grep -Ev '^(#|PHI_ACTIVE_KEY_ID|DB_PASSWORD)' .env | while IFS= read -r line; do echo "::add-mask::${line#*=}"; done
+          cat .env | grep -v '^#' | grep -v '^DB_PASSWORD' >> "$GITHUB_ENV"
+          echo "DB_PASSWORD=$(grep '^POSTGRES_PASSWORD=' .env | cut -d= -f2-)" >> "$GITHUB_ENV"
       - name: Start Postgres, Kafka, Keycloak
         run: docker compose up -d --wait
       - name: Build and start the app
         run: |
           mvn -B -q -DskipTests package
           nohup java -jar target/healthcare-ingestion-pipeline-*-SNAPSHOT.jar > app.log 2>&1 &
-          for i in $(seq 1 90); do curl -fsS http://localhost:8080/actuator/health && break; sleep 2; done
-          curl -fsS http://localhost:8080/actuator/health
+          for i in $(seq 1 90); do curl -fsS http://localhost:8081/actuator/health && break; sleep 2; done
+          curl -fsS http://localhost:8081/actuator/health
       - name: Install Playwright
         working-directory: e2e
         run: |

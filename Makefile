@@ -1,4 +1,4 @@
-.PHONY: build test it verify coverage up down run e2e-install e2e e2e-local clean
+.PHONY: env build test it verify coverage up down run e2e-install e2e e2e-local clean
 
 build:            ## compile + package (skip tests)
 	mvn -B -q -DskipTests package
@@ -15,14 +15,17 @@ verify:           ## unit + integration + jacoco reports
 coverage:         ## unit tests + jacoco report at target/site/jacoco/index.html
 	mvn -B verify -DskipITs
 
-up:               ## start Postgres, Kafka, Keycloak
+env:              ## generate .env with random dev secrets (kept if present)
+	./scripts/gen-dev-env.sh
+
+up: env           ## start Postgres, Kafka, Keycloak
 	docker compose up -d --wait
 
 down:
 	docker compose down -v
 
-run:              ## run the app against the compose stack
-	mvn -B spring-boot:run
+run: env          ## run the app against the compose stack
+	set -a; . ./.env; set +a; mvn -B spring-boot:run
 
 e2e-install:
 	cd e2e && npm install && npx playwright install --with-deps chromium

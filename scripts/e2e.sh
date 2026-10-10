@@ -3,6 +3,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+scripts/gen-dev-env.sh
+set -a; source ./.env; set +a
+
 cleanup() {
   [[ -n "${APP_PID:-}" ]] && kill "$APP_PID" 2>/dev/null || true
   [[ "${KEEP_STACK:-0}" == "1" ]] || docker compose down -v
@@ -16,9 +19,9 @@ APP_PID=$!
 
 echo "waiting for app health..."
 for i in $(seq 1 90); do
-  curl -fsS http://localhost:8080/actuator/health >/dev/null 2>&1 && break
+  curl -fsS http://localhost:8081/actuator/health >/dev/null 2>&1 && break
   sleep 2
 done
-curl -fsS http://localhost:8080/actuator/health >/dev/null || { tail -50 target/app.log; exit 1; }
+curl -fsS http://localhost:8081/actuator/health >/dev/null || { tail -50 target/app.log; exit 1; }
 
 (cd e2e && npm install --no-audit --no-fund && npx playwright install chromium && npx playwright test)

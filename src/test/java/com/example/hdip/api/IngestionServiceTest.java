@@ -24,7 +24,7 @@ class IngestionServiceTest {
 
     @Test
     void publishesToRawTopicAndAudits() {
-        var svc = new IngestionService(kafka, mapper, audit);
+        var svc = new IngestionService(kafka, mapper, audit, new com.example.hdip.observability.PipelineMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()));
         String id = svc.submit("HL7V2", "MSH|^~\\&|x");
         ArgumentCaptor<String> value = ArgumentCaptor.forClass(String.class);
         verify(kafka).send(eq(Topics.RAW), eq(id), value.capture());
@@ -34,7 +34,7 @@ class IngestionServiceTest {
 
     @Test
     void rejectsInvalidPayloadsWithoutPublishing() {
-        var svc = new IngestionService(kafka, mapper, audit);
+        var svc = new IngestionService(kafka, mapper, audit, new com.example.hdip.observability.PipelineMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()));
         assertThatThrownBy(() -> svc.submit("HL7V2", "PID|1")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> svc.submit("FHIR_JSON", "{\"a\":1}")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> svc.submit("FHIR_JSON", "nope")).isInstanceOf(IllegalArgumentException.class);

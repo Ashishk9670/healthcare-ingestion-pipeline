@@ -1,11 +1,11 @@
-# Local dev infrastructure. SYNTHETIC DATA ONLY. All credentials below are dev-only placeholders.
+# Local dev infrastructure. SYNTHETIC DATA ONLY. Secrets come from .env (run scripts/gen-dev-env.sh); no passwords are committed.
 services:
   postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: hdip
       POSTGRES_USER: hdip
-      POSTGRES_PASSWORD: hdip_dev_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run scripts/gen-dev-env.sh}
     ports: ["5432:5432"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U hdip -d hdip"]
@@ -40,9 +40,14 @@ services:
     command: ["start-dev", "--import-realm"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
-      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?run scripts/gen-dev-env.sh}
       KC_HTTP_PORT: 8080
       KC_HEALTH_ENABLED: "true"
+      # Substituted into healthcare-realm.json at import time
+      HDIP_PW_INGESTOR1: ${HDIP_PW_INGESTOR1:?run scripts/gen-dev-env.sh}
+      HDIP_PW_CLINICIAN1: ${HDIP_PW_CLINICIAN1:?run scripts/gen-dev-env.sh}
+      HDIP_PW_ANALYST1: ${HDIP_PW_ANALYST1:?run scripts/gen-dev-env.sh}
+      HDIP_PW_AUDITOR1: ${HDIP_PW_AUDITOR1:?run scripts/gen-dev-env.sh}
     ports: ["8180:8080"]
     volumes:
       - ./docker/keycloak/healthcare-realm.json:/opt/keycloak/data/import/healthcare-realm.json:ro

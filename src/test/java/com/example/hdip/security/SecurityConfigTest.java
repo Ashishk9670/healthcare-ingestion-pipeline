@@ -24,8 +24,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = IngestController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, SecurityConfigTest.Props.class})
 class SecurityConfigTest {
+    @org.springframework.boot.test.context.TestConfiguration
+    @org.springframework.boot.context.properties.EnableConfigurationProperties(com.example.hdip.ratelimit.IngestProperties.class)
+    static class Props {
+    }
+
     @Autowired MockMvc mvc;
     @MockitoBean IngestionService ingestion;
     @MockitoBean SyntheticDataGenerator generator;

@@ -23,12 +23,14 @@ import java.util.List;
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain filterChain(HttpSecurity http, @Value("${management.server.port:-1}") int managementPort) throws Exception {
         http
                 .cors(c -> c.configurationSource(corsConfigurationSource()))
                 .csrf(c -> c.disable()) // stateless bearer-token API
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(a -> a
+                        // Actuator (Prometheus, probes) is only open on the separate management port, which must not be exposed publicly
+                        .requestMatchers(r -> managementPort > 0 && r.getLocalPort() == managementPort && r.getRequestURI().startsWith("/actuator/")).permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers("/", "/index.html", "/app.js", "/config.js", "/style.css", "/favicon.ico").permitAll() // static dashboard shell
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

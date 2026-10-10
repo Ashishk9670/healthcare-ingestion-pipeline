@@ -31,12 +31,12 @@
   ],
   "users": [
     { "username": "ingestor1",  "enabled": true, "emailVerified": true, "email": "ingestor1@example.test",  "firstName": "Ingest", "lastName": "Or",
-      "credentials": [{ "type": "password", "value": "ingestor1-dev", "temporary": false }], "realmRoles": ["INGESTOR"] },
+      "credentials": [{ "type": "password", "value": "${HDIP_PW_INGESTOR1}", "temporary": false }], "realmRoles": ["INGESTOR"] },
     { "username": "clinician1", "enabled": true, "emailVerified": true, "email": "clinician1@example.test", "firstName": "Clini", "lastName": "Cian",
-      "credentials": [{ "type": "password", "value": "clinician1-dev", "temporary": false }], "realmRoles": ["CLINICIAN"] },
+      "credentials": [{ "type": "password", "value": "${HDIP_PW_CLINICIAN1}", "temporary": false }], "realmRoles": ["CLINICIAN"] },
     { "username": "analyst1",   "enabled": true, "emailVerified": true, "email": "analyst1@example.test",   "firstName": "Ana", "lastName": "Lyst",
-      "credentials": [{ "type": "password", "value": "analyst1-dev", "temporary": false }], "realmRoles": ["ANALYST"] },
+      "credentials": [{ "type": "password", "value": "${HDIP_PW_ANALYST1}", "temporary": false }], "realmRoles": ["ANALYST"] },
     { "username": "auditor1",   "enabled": true, "emailVerified": true, "email": "auditor1@example.test",   "firstName": "Audi", "lastName": "Tor",
-      "credentials": [{ "type": "password", "value": "auditor1-dev", "temporary": false }], "realmRoles": ["AUDITOR"] }
+      "credentials": [{ "type": "password", "value": "${HDIP_PW_AUDITOR1}", "temporary": false }], "realmRoles": ["AUDITOR"] }
   ]
 }

@@ -4,7 +4,7 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/hdip}
     username: ${DB_USER:hdip}
-    password: ${DB_PASSWORD:hdip_dev_password}
+    password: ${DB_PASSWORD}   # no default: supply via env / secret (see README)
   jpa:
     hibernate:
       ddl-auto: validate
@@ -36,18 +36,55 @@ spring:
 
 server:
   port: 8080
+  tomcat:
+    max-swallow-size: 2MB
+    max-http-form-post-size: 1MB
+  max-http-request-header-size: 16KB
 
 management:
+  server:
+    # Actuator (Prometheus, probes) is served on a separate, non-public port. Do not expose it outside the cluster/compose network.
+    port: ${MANAGEMENT_PORT:8081}
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        hdip.pipeline.stage.duration: true
+  observations:
+    key-values:
+      application: ${spring.application.name}
+  tracing:
+    # OpenTelemetry tracing is off unless a sampling probability is set (e.g. OTEL_TRACING_SAMPLING=0.1).
+    sampling:
+      probability: ${OTEL_TRACING_SAMPLING:0.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
 
 app:
-  # DEV-ONLY keys (base64). Override with PHI_ENCRYPTION_KEY / PHI_HMAC_KEY (e.g. from a KMS/secret manager) anywhere real.
   crypto:
-    encryption-key: ${PHI_ENCRYPTION_KEY:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
-    hmac-key: ${PHI_HMAC_KEY:ZmVkY2JhOTg3NjU0MzIxMGZlZGNiYTk4NzY1NDMyMTA=}
+    # No default keys. Provide PHI_ENCRYPTION_KEYS="k1:<base64 32 bytes>[,k2:...]", PHI_ACTIVE_KEY_ID and PHI_HMAC_KEY.
+    encryption-keys: ${PHI_ENCRYPTION_KEYS:}
+    encryption-key: ${PHI_ENCRYPTION_KEY:}
+    active-key-id: ${PHI_ACTIVE_KEY_ID:}
+    hmac-key: ${PHI_HMAC_KEY:}
   security:
     issuer: ${KEYCLOAK_ISSUER:http://localhost:8180/realms/healthcare}
     jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8180/realms/healthcare/protocol/openid-connect/certs}
+  ingest:
+    max-payload-bytes: ${INGEST_MAX_PAYLOAD_BYTES:1048576}      # 1 MiB per message
+    max-synthetic-count: 500
+    rate-limit:
+      enabled: true
+      requests-per-minute: ${INGEST_RATE_LIMIT_RPM:600}          # sustained rate per authenticated principal
+      burst: ${INGEST_RATE_LIMIT_BURST:100}

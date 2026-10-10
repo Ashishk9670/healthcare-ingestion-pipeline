@@ -3,6 +3,7 @@ package com.example.hdip.api;
 import com.example.hdip.audit.AuditService;
 import com.example.hdip.kafka.Topics;
 import com.example.hdip.model.RawMessage;
+import com.example.hdip.observability.PipelineMetrics;
 import com.example.hdip.parse.MessageParseException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,16 +20,23 @@ public class IngestionService {
     private final KafkaTemplate<String, String> kafka;
     private final ObjectMapper mapper;
     private final AuditService audit;
+    private final PipelineMetrics metrics;
 
-    public IngestionService(KafkaTemplate<String, String> kafka, ObjectMapper mapper, AuditService audit) {
+    public IngestionService(KafkaTemplate<String, String> kafka, ObjectMapper mapper, AuditService audit, PipelineMetrics metrics) {
         this.kafka = kafka;
         this.mapper = mapper;
         this.audit = audit;
+        this.metrics = metrics;
     }
 
     /** Validates the envelope shape, publishes to phi.raw and writes an audit entry. Returns the message id. */
     public String submit(String format, String payload) {
-        validate(format, payload);
+        try {
+            validate(format, payload);
+        } catch (MessageParseException e) {
+            metrics.ingestRejected("invalid");
+            throw e;
+        }
         String id = UUID.randomUUID().toString();
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String by = auth == null ? "unknown" : auth.getName();
@@ -38,6 +46,7 @@ public class IngestionService {
         } catch (Exception e) {
             throw new IllegalStateException("Could not publish message", e);
         }
+        metrics.ingestAccepted(format);
         audit.record("INGEST", "Message", id, "format=" + format + " bytes=" + payload.length());
         return id;
     }

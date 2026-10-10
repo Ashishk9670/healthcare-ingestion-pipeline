@@ -1,6 +1,7 @@
 package com.example.hdip.api;
 
 import com.example.hdip.model.RawMessage;
+import com.example.hdip.ratelimit.IngestProperties;
 import com.example.hdip.synthetic.SyntheticDataGenerator;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -15,8 +16,10 @@ import java.util.Map;
 public class IngestController {
     private final IngestionService ingestion;
     private final SyntheticDataGenerator generator;
+    private final IngestProperties props;
 
-    public IngestController(IngestionService ingestion, SyntheticDataGenerator generator) {
+    public IngestController(IngestionService ingestion, SyntheticDataGenerator generator, IngestProperties props) {
+        this.props = props;
         this.ingestion = ingestion;
         this.generator = generator;
     }
@@ -37,7 +40,7 @@ public class IngestController {
     @PostMapping("/synthetic")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public Map<String, Object> synthetic(@RequestParam(defaultValue = "10") int count) {
-        int n = Math.max(1, Math.min(count, 500));
+        int n = Math.max(1, Math.min(count, props.maxSyntheticCount()));
         List<String> ids = new ArrayList<>();
         for (int i = 0; i < n; i++) {
             ids.add(i % 2 == 0
