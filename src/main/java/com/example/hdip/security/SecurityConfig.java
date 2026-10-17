@@ -33,7 +33,9 @@ public class SecurityConfig {
                         // With a separate management port, actuator endpoints (Prometheus, probes) are not served on the public
                         // port at all and are open on the management port, which must not be exposed publicly.
                         if (managementPort > 0 && managementPort != serverPort) {
-                            a.requestMatchers("/actuator/prometheus").permitAll();
+                            // match on the connector's local port (robust for the management child context)
+                            a.requestMatchers(req -> req.getLocalPort() == managementPort
+                                    && req.getRequestURI().startsWith("/actuator/")).permitAll();
                         }
                         a
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
