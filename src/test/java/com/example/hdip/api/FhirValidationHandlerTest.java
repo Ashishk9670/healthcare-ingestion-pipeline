@@ -13,4 +13,11 @@ class FhirValidationHandlerTest {
         assertThat(res.getHeaders().getContentType().toString()).isEqualTo("application/fhir+json");
         assertThat(res.getBody()).contains("OperationOutcome");
     }
+
+    @Test
+    void invalidBodyIs400WithFixedText() {
+        var pd = new ApiExceptionHandler().invalidBody(new IllegalStateException("secret payload"));
+        assertThat(pd.getStatus()).isEqualTo(400);
+        assertThat(pd.getDetail()).isEqualTo("Invalid request body");
+    }
 }
