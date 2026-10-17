@@ -2,8 +2,14 @@ package com.example.hdip.store;
 
 import com.example.hdip.crypto.AesGcmFieldCipher;
 import com.example.hdip.store.PatientViews.*;
+import com.example.hdip.extract.ClinicalExtractionEntity;
+import com.example.hdip.extract.ExtractedFact;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,8 +60,29 @@ public class PatientQueryService {
             }
             if (f != null && notBlank(f.ageBand())) ps.add(cb.equal(root.get("ageBand"), f.ageBand().trim()));
             if (f != null && notBlank(f.gender())) ps.add(cb.equal(cb.lower(root.get("gender")), f.gender().trim().toLowerCase()));
+            if (f != null) {
+                addExtraction(ps, root, query, cb, ExtractedFact.Kind.DIAGNOSIS, f.extractedDiagnosis());
+                addExtraction(ps, root, query, cb, ExtractedFact.Kind.MEDICATION, f.medication());
+                addExtraction(ps, root, query, cb, ExtractedFact.Kind.STAGE, f.stage());
+            }
             return cb.and(ps.toArray(new Predicate[0]));
         };
+    }
+
+    /** EXISTS (select 1 from clinical_extraction e where e.mrn_hash = p.mrn_hash and kind/value match). */
+    private static void addExtraction(List<Predicate> ps, Root<PatientEntity> root, CriteriaQuery<?> query, CriteriaBuilder cb,
+                                      ExtractedFact.Kind kind, String filterValue) {
+        if (!notBlank(filterValue)) return;
+        Subquery<Integer> sub = query.subquery(Integer.class);
+        Root<ClinicalExtractionEntity> e = sub.from(ClinicalExtractionEntity.class);
+        String v = filterValue.trim();
+        Predicate match = switch (kind) {
+            case DIAGNOSIS -> cb.like(cb.upper(e.get("code")), v.toUpperCase() + "%");
+            case MEDICATION -> cb.equal(cb.lower(e.get("value")), v.toLowerCase());
+            case STAGE -> cb.equal(cb.upper(e.get("value")), v.toUpperCase());
+        };
+        sub.select(cb.literal(1)).where(cb.equal(e.get("mrnHash"), root.get("mrnHash")), cb.equal(e.get("kind"), kind), match);
+        ps.add(cb.exists(sub));
     }
 
     private PatientView toView(PatientEntity p) {

@@ -18,7 +18,12 @@ public final class PatientViews {
                               String ageBand, List<DiagnosisView> diagnoses, List<ObservationView> observations) {
     }
 
-    public record CohortFilter(String diagnosisCode, String ageBand, String gender) {
+    /**
+     * {@code extractedDiagnosis} (ICD-10 prefix), {@code medication} and {@code stage} match facts extracted from
+     * clinical notes by the enrichment stage (phi.extracted).
+     */
+    public record CohortFilter(String diagnosisCode, String ageBand, String gender, String extractedDiagnosis,
+                               String medication, String stage) {
     }
 
     public record Bucket(String key, int count) {

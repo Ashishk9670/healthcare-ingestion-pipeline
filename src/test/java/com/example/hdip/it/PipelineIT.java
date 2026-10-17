@@ -104,4 +104,24 @@ class PipelineIT extends AbstractIntegrationTest {
         assertThat(http("POST", "/api/v1/ingest/hl7", t, "text/plain", "not hl7").status()).isEqualTo(400);
         assertThat(http("POST", "/api/v1/ingest/fhir", t, "application/json", "{\"x\":1}").status()).isEqualTo(400);
     }
+
+    @Test
+    void clinicalNoteIsExtractedAndExposedInCohortFilters() {
+        String mrn = "SYN-IT-N" + System.nanoTime();
+        String msg = hl7(mrn) + "\rNTE|1||Assessment: breast cancer, stage IIB. Current therapy: tamoxifen 20 mg daily.";
+        assertThat(http("POST", "/api/v1/ingest/hl7", token("ingestor1"), "text/plain", msg).status()).isEqualTo(202);
+        String hash = cipher.hmac(mrn);
+        await().atMost(Duration.ofSeconds(60)).untilAsserted(() ->
+                assertThat(jdbc.queryForList("select value from clinical_extraction where mrn_hash = ?", String.class, hash))
+                        .contains("breast cancer", "IIB", "tamoxifen"));
+        // note text itself is never persisted
+        assertThat(jdbc.queryForList("select value || coalesce(code,'') from clinical_extraction where mrn_hash = ?", String.class, hash))
+                .allSatisfy(v -> assertThat(v).doesNotContain("Assessment"));
+
+        String q = "{ cohort(filter:{extractedDiagnosis:\"C50\", medication:\"tamoxifen\", stage:\"IIB\"}){ totalPatients } }";
+        await().atMost(Duration.ofSeconds(60)).untilAsserted(() ->
+                assertThat(graphql(token("analyst1"), q).json().at("/data/cohort/totalPatients").asInt()).isGreaterThanOrEqualTo(1));
+        String none = "{ cohort(filter:{medication:\"pembrolizumab\", stage:\"IIB\"}){ totalPatients } }";
+        assertThat(graphql(token("analyst1"), none).json().at("/data/cohort/totalPatients").asInt()).isZero();
+    }
 }

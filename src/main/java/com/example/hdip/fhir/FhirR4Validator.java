@@ -11,6 +11,8 @@ import org.hl7.fhir.common.hapi.validation.support.InMemoryTerminologyServerVali
 import org.hl7.fhir.common.hapi.validation.support.ValidationSupportChain;
 import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
 import org.hl7.fhir.r4.model.OperationOutcome;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.util.regex.Pattern;
@@ -44,6 +46,14 @@ public class FhirR4Validator {
             }
         }
         return v;
+    }
+
+    /** Loads the (slow) profile/terminology packages in the background so the first request is not penalised. */
+    @EventListener(ApplicationReadyEvent.class)
+    void warmUp() {
+        Thread t = new Thread(() -> validate("{\"resourceType\":\"Patient\"}"), "fhir-validator-warmup");
+        t.setDaemon(true);
+        t.start();
     }
 
     /** Returns null when the payload is valid; otherwise a sanitized OperationOutcome containing the errors. */

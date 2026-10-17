@@ -21,4 +21,9 @@ public class KafkaConfig {
     NewTopic enrichedTopic() {
         return TopicBuilder.name(Topics.ENRICHED).partitions(3).replicas(1).build();
     }
+
+    @Bean
+    NewTopic extractedTopic() {
+        return TopicBuilder.name(Topics.EXTRACTED).partitions(3).replicas(1).build();
+    }
 }

@@ -55,4 +55,13 @@ class FhirJsonNormalizerTest {
         assertThatThrownBy(() -> n.parse("m", "{\"resourceType\":\"Patient\",\"identifier\":[{\"value\":\"A\"}],\"birthDate\":\"zzz\"}"))
                 .isInstanceOf(MessageParseException.class);
     }
+
+    @Test
+    void decodesDocumentReferenceTextAttachmentAsNote() {
+        String data = java.util.Base64.getEncoder().encodeToString("Stage IV lung cancer".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String json = "{\"resourceType\":\"Bundle\",\"entry\":[{\"resource\":{\"resourceType\":\"Patient\",\"identifier\":[{\"value\":\"SYN-1\"}]}},"
+                + "{\"resource\":{\"resourceType\":\"DocumentReference\",\"content\":[{\"attachment\":{\"contentType\":\"text/plain\",\"data\":\"" + data + "\"}}]}}]}";
+        var rec = new FhirJsonNormalizer(new com.fasterxml.jackson.databind.ObjectMapper()).parse("m", json);
+        assertThat(rec.notes()).containsExactly("Stage IV lung cancer");
+    }
 }

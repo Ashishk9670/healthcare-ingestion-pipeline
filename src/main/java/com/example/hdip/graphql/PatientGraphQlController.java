@@ -44,7 +44,10 @@ public class PatientGraphQlController {
         CohortSummary s = queries.cohort(filter, limit == null ? 50 : Math.max(0, Math.min(limit, 500)));
         audit.record("COHORT_QUERY", "Cohort", null, "dx=" + (filter == null ? null : filter.diagnosisCode())
                 + " ageBand=" + (filter == null ? null : filter.ageBand())
-                + " gender=" + (filter == null ? null : filter.gender()) + " total=" + s.totalPatients());
+                + " gender=" + (filter == null ? null : filter.gender())
+                + " exDx=" + (filter == null ? null : filter.extractedDiagnosis())
+                + " med=" + (filter == null ? null : filter.medication())
+                + " stage=" + (filter == null ? null : filter.stage()) + " total=" + s.totalPatients());
         return s;
     }
 

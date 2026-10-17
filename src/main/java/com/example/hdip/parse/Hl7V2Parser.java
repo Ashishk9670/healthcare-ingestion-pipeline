@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 /**
- * Minimal HL7 v2.x parser (ORU/ADT style) handling MSH, PID, OBX and DG1 segments.
+ * Minimal HL7 v2.x parser (ORU/ADT style) handling MSH, PID, OBX, DG1 and NTE segments.
  * Field numbering follows the HL7 spec (1-based; MSH-1 is the field separator).
  */
 @Component
@@ -38,6 +38,7 @@ public class Hl7V2Parser {
         CanonicalPatient patient = null;
         List<CanonicalObservation> observations = new ArrayList<>();
         List<CanonicalDiagnosis> diagnoses = new ArrayList<>();
+        List<String> notes = new ArrayList<>();
 
         for (int i = 1; i < segments.length; i++) {
             String seg = segments[i];
@@ -47,6 +48,10 @@ public class Hl7V2Parser {
                 case "PID" -> patient = parsePid(f, compSep, repSep);
                 case "OBX" -> observations.add(parseObx(f, compSep));
                 case "DG1" -> diagnoses.add(parseDg1(f, compSep));
+                case "NTE" -> {
+                    String note = get(f, 3); // NTE-3 comment (free text)
+                    if (note != null) notes.add(note);
+                }
                 default -> { /* ignored */ }
             }
         }
@@ -54,7 +59,7 @@ public class Hl7V2Parser {
         if (patient.mrn() == null || patient.mrn().isBlank()) {
             throw new MessageParseException("PID-3 (patient identifier) is required");
         }
-        return new CanonicalRecord(id, RawMessage.HL7V2, patient, observations, diagnoses);
+        return new CanonicalRecord(id, RawMessage.HL7V2, patient, observations, diagnoses, notes);
     }
 
     private CanonicalPatient parsePid(String[] f, char compSep, char repSep) {

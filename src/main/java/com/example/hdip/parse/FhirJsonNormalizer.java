@@ -44,18 +44,20 @@ public class FhirJsonNormalizer {
         CanonicalPatient patient = null;
         List<CanonicalObservation> observations = new ArrayList<>();
         List<CanonicalDiagnosis> diagnoses = new ArrayList<>();
+        List<String> notes = new ArrayList<>();
         for (JsonNode r : resources) {
             switch (r.path("resourceType").asText()) {
                 case "Patient" -> patient = patient(r);
                 case "Observation" -> observations.add(observation(r));
                 case "Condition" -> diagnoses.add(condition(r));
+                case "DocumentReference" -> notes.addAll(notes(r));
                 default -> { /* ignored */ }
             }
         }
         if (patient == null) throw new MessageParseException("FHIR payload has no Patient resource");
         if (patient.mrn() == null) throw new MessageParseException("Patient.identifier is required");
         String id = messageId != null ? messageId : root.path("id").asText(null);
-        return new CanonicalRecord(id, RawMessage.FHIR_JSON, patient, observations, diagnoses);
+        return new CanonicalRecord(id, RawMessage.FHIR_JSON, patient, observations, diagnoses, notes);
     }
 
     private CanonicalPatient patient(JsonNode p) {
@@ -102,6 +104,22 @@ public class FhirJsonNormalizer {
         JsonNode coding = c.path("code").path("coding").path(0);
         return new CanonicalDiagnosis(coding.path("code").asText(null), coding.path("system").asText(null),
                 coding.path("display").asText(c.path("code").path("text").asText(null)));
+    }
+
+    /** Free-text notes: DocumentReference.content[].attachment with text/* contentType and base64 data. */
+    private List<String> notes(JsonNode d) {
+        List<String> out = new ArrayList<>();
+        for (JsonNode c : d.path("content")) {
+            JsonNode a = c.path("attachment");
+            if (a.path("contentType").asText("").startsWith("text/") && a.hasNonNull("data")) {
+                try {
+                    out.add(new String(java.util.Base64.getDecoder().decode(a.get("data").asText()), java.nio.charset.StandardCharsets.UTF_8));
+                } catch (IllegalArgumentException e) {
+                    throw new MessageParseException("Invalid base64 note attachment", e);
+                }
+            }
+        }
+        return out;
     }
 
     private LocalDate parseDate(String s) {
