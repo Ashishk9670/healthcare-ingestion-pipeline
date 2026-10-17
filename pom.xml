@@ -24,6 +24,7 @@
     <jackson-bom.version>2.21.7</jackson-bom.version>
     <tomcat.version>10.1.60</tomcat.version>
     <jacoco.minimum>0.70</jacoco.minimum>
+    <hapi.version>7.6.1</hapi.version>
     <testcontainers.version>1.21.3</testcontainers.version>
     <!-- Lets Mockito/ByteBuddy run on newer JDKs than the one it was built against -->
     <test.argLine>-Dnet.bytebuddy.experimental=true -XX:+EnableDynamicAgentLoading</test.argLine>
@@ -49,6 +50,10 @@
     <dependency><groupId>org.springframework.kafka</groupId><artifactId>spring-kafka</artifactId></dependency>
     <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-core</artifactId></dependency>
     <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-database-postgresql</artifactId></dependency>
+    <dependency><groupId>ca.uhn.hapi.fhir</groupId><artifactId>hapi-fhir-structures-r4</artifactId><version>${hapi.version}</version></dependency>
+    <dependency><groupId>ca.uhn.hapi.fhir</groupId><artifactId>hapi-fhir-caching-caffeine</artifactId><version>${hapi.version}</version></dependency>
+    <dependency><groupId>ca.uhn.hapi.fhir</groupId><artifactId>hapi-fhir-validation</artifactId><version>${hapi.version}</version></dependency>
+    <dependency><groupId>ca.uhn.hapi.fhir</groupId><artifactId>hapi-fhir-validation-resources-r4</artifactId><version>${hapi.version}</version></dependency>
     <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId><scope>runtime</scope></dependency>
 
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>

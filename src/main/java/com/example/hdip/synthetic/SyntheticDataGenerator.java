@@ -115,7 +115,10 @@ public class SyntheticDataGenerator {
         bundle.put("resourceType", "Bundle").put("type", "collection").put("id", UUID.randomUUID().toString());
         ArrayNode entries = bundle.putArray("entry");
 
-        ObjectNode pat = entries.addObject().putObject("resource");
+        String patUrl = "urn:uuid:" + UUID.randomUUID();
+        ObjectNode patEntry = entries.addObject();
+        patEntry.put("fullUrl", patUrl);
+        ObjectNode pat = patEntry.putObject("resource");
         pat.put("resourceType", "Patient");
         ArrayNode ids = pat.putArray("identifier");
         ids.addObject().put("system", "urn:synthetic:mrn").put("value", p.mrn());
@@ -127,14 +130,21 @@ public class SyntheticDataGenerator {
         pat.put("birthDate", p.dob().toString());
 
         for (String[] d : p.diagnoses()) {
-            ObjectNode c = entries.addObject().putObject("resource");
+            ObjectNode ce = entries.addObject();
+            ce.put("fullUrl", "urn:uuid:" + UUID.randomUUID());
+            ObjectNode c = ce.putObject("resource");
             c.put("resourceType", "Condition");
+            c.putObject("subject").put("reference", patUrl);
             c.putObject("code").putArray("coding").addObject()
                     .put("system", "http://hl7.org/fhir/sid/icd-10-cm").put("code", d[0]).put("display", d[1]);
         }
         for (String[] o : p.observations()) {
-            ObjectNode ob = entries.addObject().putObject("resource");
+            ObjectNode oe = entries.addObject();
+            oe.put("fullUrl", "urn:uuid:" + UUID.randomUUID());
+            ObjectNode ob = oe.putObject("resource");
             ob.put("resourceType", "Observation");
+            ob.put("status", "final");
+            ob.putObject("subject").put("reference", patUrl);
             ob.putObject("code").putArray("coding").addObject()
                     .put("system", "http://loinc.org").put("code", o[0]).put("display", o[1]);
             ob.putObject("valueQuantity").put("value", Double.parseDouble(o[3])).put("unit", o[2]);

@@ -24,7 +24,7 @@ class IngestionServiceTest {
 
     @Test
     void publishesToRawTopicAndAudits() {
-        var svc = new IngestionService(kafka, mapper, audit, new com.example.hdip.observability.PipelineMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()));
+        var svc = new IngestionService(kafka, mapper, audit, new com.example.hdip.observability.PipelineMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()), new com.example.hdip.fhir.FhirR4Validator());
         String id = svc.submit("HL7V2", "MSH|^~\\&|x");
         ArgumentCaptor<String> value = ArgumentCaptor.forClass(String.class);
         verify(kafka).send(eq(Topics.RAW), eq(id), value.capture());
@@ -34,7 +34,7 @@ class IngestionServiceTest {
 
     @Test
     void rejectsInvalidPayloadsWithoutPublishing() {
-        var svc = new IngestionService(kafka, mapper, audit, new com.example.hdip.observability.PipelineMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()));
+        var svc = new IngestionService(kafka, mapper, audit, new com.example.hdip.observability.PipelineMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()), new com.example.hdip.fhir.FhirR4Validator());
         assertThatThrownBy(() -> svc.submit("HL7V2", "PID|1")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> svc.submit("FHIR_JSON", "{\"a\":1}")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> svc.submit("FHIR_JSON", "nope")).isInstanceOf(IllegalArgumentException.class);
@@ -42,5 +42,14 @@ class IngestionServiceTest {
         assertThatThrownBy(() -> svc.submit("HL7V2", " ")).isInstanceOf(IllegalArgumentException.class);
         verify(kafka, never()).send(anyString(), anyString(), anyString());
         verifyNoInteractions(audit);
+    }
+
+    @Test
+    void rejectsInvalidFhirWithOperationOutcome() {
+        var svc = new IngestionService(kafka, mapper, audit, new com.example.hdip.observability.PipelineMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()), new com.example.hdip.fhir.FhirR4Validator());
+        assertThatThrownBy(() -> svc.submit("FHIR_JSON", "{\"resourceType\":\"Observation\"}"))
+                .isInstanceOf(com.example.hdip.fhir.FhirValidationException.class)
+                .satisfies(e -> assertThat(((com.example.hdip.fhir.FhirValidationException) e).operationOutcomeJson()).contains("OperationOutcome"));
+        verify(kafka, never()).send(anyString(), anyString(), anyString());
     }
 }

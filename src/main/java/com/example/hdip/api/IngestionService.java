@@ -1,6 +1,8 @@
 package com.example.hdip.api;
 
 import com.example.hdip.audit.AuditService;
+import com.example.hdip.fhir.FhirR4Validator;
+import com.example.hdip.fhir.FhirValidationException;
 import com.example.hdip.kafka.Topics;
 import com.example.hdip.model.RawMessage;
 import com.example.hdip.observability.PipelineMetrics;
@@ -21,8 +23,11 @@ public class IngestionService {
     private final ObjectMapper mapper;
     private final AuditService audit;
     private final PipelineMetrics metrics;
+    private final FhirR4Validator fhirValidator;
 
-    public IngestionService(KafkaTemplate<String, String> kafka, ObjectMapper mapper, AuditService audit, PipelineMetrics metrics) {
+    public IngestionService(KafkaTemplate<String, String> kafka, ObjectMapper mapper, AuditService audit, PipelineMetrics metrics,
+                            FhirR4Validator fhirValidator) {
+        this.fhirValidator = fhirValidator;
         this.kafka = kafka;
         this.mapper = mapper;
         this.audit = audit;
@@ -59,6 +64,8 @@ public class IngestionService {
             try {
                 JsonNode n = mapper.readTree(payload);
                 if (!n.hasNonNull("resourceType")) throw new MessageParseException("Missing resourceType");
+                var outcome = fhirValidator.validate(payload);
+                if (outcome != null) throw new FhirValidationException(fhirValidator.toJson(outcome));
             } catch (MessageParseException e) {
                 throw e;
             } catch (Exception e) {

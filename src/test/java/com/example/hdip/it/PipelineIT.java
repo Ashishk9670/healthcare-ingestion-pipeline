@@ -36,9 +36,9 @@ class PipelineIT extends AbstractIntegrationTest {
     private static String fhir(String mrn) {
         return """
                 {"resourceType":"Bundle","type":"collection","entry":[
-                 {"resource":{"resourceType":"Patient","identifier":[{"system":"urn:synthetic:mrn","value":"%s"}],
+                 {"fullUrl":"urn:uuid:11111111-1111-4111-8111-111111111111","resource":{"resourceType":"Patient","identifier":[{"system":"urn:synthetic:mrn","value":"%s"}],
                    "name":[{"family":"Faux","given":["Casey"]}],"gender":"female","birthDate":"1985-06-01"}},
-                 {"resource":{"resourceType":"Condition","code":{"coding":[{"system":"icd10","code":"I10"}]}}}]}
+                 {"fullUrl":"urn:uuid:22222222-2222-4222-8222-222222222222","resource":{"resourceType":"Condition","subject":{"reference":"urn:uuid:11111111-1111-4111-8111-111111111111"},"code":{"coding":[{"system":"http://hl7.org/fhir/sid/icd-10-cm","code":"I10"}]}}}]}
                 """.formatted(mrn);
     }
 
