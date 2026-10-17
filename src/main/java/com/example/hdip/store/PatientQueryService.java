@@ -1,5 +1,7 @@
 package com.example.hdip.store;
 
+import com.example.hdip.consent.ConsentScope;
+import com.example.hdip.consent.ConsentService;
 import com.example.hdip.crypto.AesGcmFieldCipher;
 import com.example.hdip.store.PatientViews.*;
 import com.example.hdip.extract.ClinicalExtractionEntity;
@@ -20,8 +22,10 @@ import java.util.*;
 public class PatientQueryService {
     private final PatientRepository repo;
     private final AesGcmFieldCipher cipher;
+    private final ConsentService consent;
 
-    public PatientQueryService(PatientRepository repo, AesGcmFieldCipher cipher) {
+    public PatientQueryService(PatientRepository repo, AesGcmFieldCipher cipher, ConsentService consent) {
+        this.consent = consent;
         this.repo = repo;
         this.cipher = cipher;
     }
@@ -33,7 +37,7 @@ public class PatientQueryService {
 
     @Transactional(readOnly = true)
     public CohortSummary cohort(CohortFilter filter, int memberLimit) {
-        List<PatientEntity> patients = repo.findAll(spec(filter));
+        List<PatientEntity> patients = repo.findAll(spec(filter).and(consent.permitted(ConsentScope.COHORT)));
         Map<String, Integer> byAge = new TreeMap<>();
         Map<String, Integer> byGender = new TreeMap<>();
         Map<String, Integer> byDx = new TreeMap<>();

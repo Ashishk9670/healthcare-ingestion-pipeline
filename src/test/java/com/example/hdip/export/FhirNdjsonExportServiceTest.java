@@ -7,7 +7,11 @@ import com.example.hdip.store.PatientEntity;
 import com.example.hdip.store.PatientRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.hdip.consent.ConsentScope;
+import com.example.hdip.consent.ConsentService;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import org.springframework.data.jpa.domain.Specification;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,8 +34,14 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class FhirNdjsonExportServiceTest {
     @Mock PatientRepository repo;
+    @Mock ConsentService consent;
     @Mock PlatformTransactionManager tm;
     final ObjectMapper mapper = new ObjectMapper();
+
+    @org.junit.jupiter.api.BeforeEach
+    void gate() {
+        org.mockito.Mockito.lenient().when(consent.permitted(ConsentScope.EXPORT)).thenReturn((root, q, cb) -> null);
+    }
 
     private PatientEntity phiLadenPatient() {
         var p = new PatientEntity();
@@ -68,8 +78,8 @@ class FhirNdjsonExportServiceTest {
     @Test
     void exportsOnlyDeidentifiedResourcesAsNdjson() throws Exception {
         PatientEntity p = phiLadenPatient();
-        when(repo.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(p))).thenReturn(new PageImpl<>(List.of()));
-        var svc = new FhirNdjsonExportService(repo, new SafeHarborDeidentifier(Clock.fixed(Instant.parse("2026-06-15T00:00:00Z"), ZoneOffset.UTC)), mapper, tm);
+        when(repo.findAll(ArgumentMatchers.<Specification<PatientEntity>>any(), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(p))).thenReturn(new PageImpl<>(List.of()));
+        var svc = new FhirNdjsonExportService(repo, consent, new SafeHarborDeidentifier(Clock.fixed(Instant.parse("2026-06-15T00:00:00Z"), ZoneOffset.UTC)), mapper, tm);
         var out = new ByteArrayOutputStream();
         var res = svc.export(out, 100);
 
@@ -97,9 +107,16 @@ class FhirNdjsonExportServiceTest {
     }
 
     @Test
+    void exportQueryIsGatedByExportConsent() throws Exception {
+        when(repo.findAll(ArgumentMatchers.<Specification<PatientEntity>>any(), any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
+        new FhirNdjsonExportService(repo, consent, new SafeHarborDeidentifier(Clock.systemUTC()), mapper, tm).export(new ByteArrayOutputStream(), 10);
+        org.mockito.Mockito.verify(consent).permitted(ConsentScope.EXPORT);
+    }
+
+    @Test
     void honoursPatientLimit() throws Exception {
-        when(repo.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(phiLadenPatient(), phiLadenPatient())));
-        var svc = new FhirNdjsonExportService(repo, new SafeHarborDeidentifier(Clock.systemUTC()), mapper, tm);
+        when(repo.findAll(ArgumentMatchers.<Specification<PatientEntity>>any(), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(phiLadenPatient(), phiLadenPatient())));
+        var svc = new FhirNdjsonExportService(repo, consent, new SafeHarborDeidentifier(Clock.systemUTC()), mapper, tm);
         var res = svc.export(new ByteArrayOutputStream(), 1);
         assertThat(res.patients()).isEqualTo(1);
     }

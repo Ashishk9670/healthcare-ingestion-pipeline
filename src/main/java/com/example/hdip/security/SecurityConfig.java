@@ -43,6 +43,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/v1/ingest/**", "/api/v1/synthetic/**").hasRole("INGESTOR")
                         .requestMatchers("/api/v1/export/**").hasRole("ANALYST")
+                        .requestMatchers("/api/v1/consent/**").hasRole("CLINICIAN")
                         .requestMatchers("/graphql").authenticated() // field-level rules via @PreAuthorize
                         .anyRequest().denyAll();
                 })

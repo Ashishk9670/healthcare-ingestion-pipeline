@@ -1,5 +1,7 @@
 package com.example.hdip.export;
 
+import com.example.hdip.consent.ConsentScope;
+import com.example.hdip.consent.ConsentService;
 import com.example.hdip.deid.SafeHarborDeidentifier;
 import com.example.hdip.store.DiagnosisEntity;
 import com.example.hdip.store.ObservationEntity;
@@ -21,7 +23,7 @@ import java.util.List;
 
 /**
  * Bulk FHIR R4 NDJSON export (Patient, Condition, Observation), de-identified with the Safe Harbor method. Resources are
- * built from stored data and then passed through {@link SafeHarborDeidentifier} (defence in depth: nothing is emitted
+ * built from stored data of patients whose EXPORT consent permits it, and then passed through {@link SafeHarborDeidentifier} (defence in depth: nothing is emitted
  * that has not been through the de-identifier). Patient resource ids are the random surrogate UUIDs of the store.
  */
 @Service
@@ -32,12 +34,14 @@ public class FhirNdjsonExportService {
     }
 
     private final PatientRepository patients;
+    private final ConsentService consent;
     private final SafeHarborDeidentifier deid;
     private final ObjectMapper mapper;
     private final TransactionTemplate tx;
 
-    public FhirNdjsonExportService(PatientRepository patients, SafeHarborDeidentifier deid, ObjectMapper mapper,
+    public FhirNdjsonExportService(PatientRepository patients, ConsentService consent, SafeHarborDeidentifier deid, ObjectMapper mapper,
                                    PlatformTransactionManager txManager) {
+        this.consent = consent;
         this.patients = patients;
         this.deid = deid;
         this.mapper = mapper;
@@ -65,7 +69,7 @@ public class FhirNdjsonExportService {
     }
 
     private List<String> linesForPage(int page, int remaining) {
-        var slice = patients.findAll(PageRequest.of(page, PAGE_SIZE, Sort.by("createdAt", "id")));
+        var slice = patients.findAll(consent.permitted(ConsentScope.EXPORT), PageRequest.of(page, PAGE_SIZE, Sort.by("createdAt", "id")));
         List<String> lines = new ArrayList<>();
         int count = 0;
         for (PatientEntity p : slice.getContent()) {

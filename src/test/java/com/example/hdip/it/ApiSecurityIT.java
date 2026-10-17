@@ -26,6 +26,7 @@ class ApiSecurityIT extends AbstractIntegrationTest {
     @Autowired PatientStoreService store;
     @Autowired AuditService audit;
     @Autowired AesGcmFieldCipher cipher;
+    @Autowired com.example.hdip.store.PatientRepository patientRepo;
     static boolean seeded;
 
     @BeforeAll
@@ -189,6 +190,52 @@ class ApiSecurityIT extends AbstractIntegrationTest {
         assertThat(audit.latest(500)).anySatisfy(e -> {
             assertThat(e.getAction()).isEqualTo("EXPORT_FHIR_NDJSON_DONE");
             assertThat(e.getActor()).isEqualTo("analyst1");
+        });
+    }
+
+    @Test
+    void consentGatesCohortInclusionAndExport() {
+        String mrn = "SYN-CONSENT-" + System.nanoTime();
+        var p = new CanonicalPatient(mrn, "Consentson", "Pat", LocalDate.of(1970, 1, 1), "female", null);
+        store.persist(new EnrichedRecord(new CanonicalRecord("c-1", "HL7V2", p, List.of(),
+                List.of(new CanonicalDiagnosis("Z99.1", "I10", "Synthetic consent probe"))), "50-64", Instant.now()));
+        String patientId = patientRepo.findByMrnHash(cipher.hmac(mrn)).orElseThrow().getId().toString();
+        String cohort = "{ cohort(filter:{diagnosisCode:\"Z99\"}){ totalPatients } }";
+        String analyst = token("analyst1");
+        String clinician = token("clinician1");
+
+        // default policy (opt-out): included in both cohort and export
+        assertThat(graphql(analyst, cohort).json().at("/data/cohort/totalPatients").asInt()).isEqualTo(1);
+        assertThat(http("GET", "/api/v1/export/fhir/ndjson?limit=10000", analyst, null, null).body()).contains(patientId);
+
+        // only clinicians may record consent
+        String withdrawCohort = "{\"mrn\":\"" + mrn + "\",\"scope\":\"COHORT\",\"status\":\"WITHDRAWN\"}";
+        assertThat(http("POST", "/api/v1/consent", analyst, "application/json", withdrawCohort).status()).isEqualTo(403);
+        var rec = http("POST", "/api/v1/consent", clinician, "application/json", withdrawCohort);
+        assertThat(rec.status()).isEqualTo(201);
+        assertThat(rec.body()).doesNotContain(mrn);
+
+        // cohort scope withdrawn: out of cohort, still in export (different scope)
+        assertThat(graphql(analyst, cohort).json().at("/data/cohort/totalPatients").asInt()).isZero();
+        assertThat(http("GET", "/api/v1/export/fhir/ndjson?limit=10000", analyst, null, null).body()).contains(patientId);
+
+        // withdraw export too
+        String withdrawExport = withdrawCohort.replace("COHORT", "EXPORT");
+        assertThat(http("POST", "/api/v1/consent", clinician, "application/json", withdrawExport).status()).isEqualTo(201);
+        assertThat(http("GET", "/api/v1/export/fhir/ndjson?limit=10000", analyst, null, null).body()).doesNotContain(patientId);
+
+        // re-grant cohort consent (later effective time) restores inclusion
+        String grant = withdrawCohort.replace("WITHDRAWN", "GRANTED");
+        assertThat(http("POST", "/api/v1/consent", clinician, "application/json", grant).status()).isEqualTo(201);
+        assertThat(graphql(analyst, cohort).json().at("/data/cohort/totalPatients").asInt()).isEqualTo(1);
+
+        // validation + audit (hash only, never the MRN)
+        assertThat(http("POST", "/api/v1/consent", clinician, "application/json", "{\"mrn\":\"x\"}").status()).isEqualTo(400);
+        assertThat(audit.latest(500)).anySatisfy(e -> {
+            assertThat(e.getAction()).isEqualTo("CONSENT_RECORD");
+            assertThat(e.getActor()).isEqualTo("clinician1");
+            assertThat(e.getResourceId()).isEqualTo(cipher.hmac(mrn));
+            assertThat(e.getDetail()).doesNotContain(mrn);
         });
     }
 }
