@@ -9,7 +9,7 @@ RUN --mount=type=cache,target=/root/.m2 mvn -B -q -DskipTests package \
     && cp target/healthcare-ingestion-pipeline-*.jar /workspace/app.jar \
     && java -Djarmode=tools -jar /workspace/app.jar extract --layers --destination /workspace/layers
 
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 RUN apk upgrade --no-cache && addgroup -S -g 10001 hdip && adduser -S -u 10001 -G hdip hdip
 WORKDIR /app
 COPY --from=build --chown=hdip:hdip /workspace/layers/dependencies/ ./
