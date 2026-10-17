@@ -174,4 +174,21 @@ class ApiSecurityIT extends AbstractIntegrationTest {
             assertThat(e.getDetail()).doesNotContain(MRN);
         });
     }
+
+    @Test
+    void deidentifiedNdjsonExportIsAnalystOnlyAndAudited() {
+        seed();
+        assertThat(http("GET", "/api/v1/export/fhir/ndjson", null, null, null).status()).isEqualTo(401);
+        for (String u : List.of("ingestor1", "clinician1", "auditor1")) {
+            assertThat(http("GET", "/api/v1/export/fhir/ndjson", token(u), null, null).status()).as(u).isEqualTo(403);
+        }
+        var r = http("GET", "/api/v1/export/fhir/ndjson?limit=500", token("analyst1"), null, null);
+        assertThat(r.status()).isEqualTo(200);
+        assertThat(r.body()).contains("\"resourceType\":\"Patient\"").contains("ANONYED");
+        assertThat(r.body()).doesNotContain("Testerson", "Alex", MRN, "900-00-0001", "1965-03-15");
+        assertThat(audit.latest(500)).anySatisfy(e -> {
+            assertThat(e.getAction()).isEqualTo("EXPORT_FHIR_NDJSON_DONE");
+            assertThat(e.getActor()).isEqualTo("analyst1");
+        });
+    }
 }

@@ -42,6 +42,7 @@ public class SecurityConfig {
                         .requestMatchers("/", "/index.html", "/app.js", "/config.js", "/style.css", "/favicon.ico").permitAll() // static dashboard shell
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/v1/ingest/**", "/api/v1/synthetic/**").hasRole("INGESTOR")
+                        .requestMatchers("/api/v1/export/**").hasRole("ANALYST")
                         .requestMatchers("/graphql").authenticated() // field-level rules via @PreAuthorize
                         .anyRequest().denyAll();
                 })
