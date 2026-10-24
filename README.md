@@ -10,21 +10,34 @@
 > `SYN-` MRNs, SSNs from the never-issued 9xx range. No secrets are committed: dev passwords and
 > encryption keys are generated locally into a git-ignored `.env`.
 
-Spring Boot 3.5 / Java 21 / Maven. Ingests HL7 v2 and FHIR-like JSON, runs it through three Kafka stages,
-stores it encrypted in PostgreSQL and serves aggregated patient/cohort views over GraphQL, with audit logging,
-RBAC (Keycloak) and PHI-masked logs.
+Spring Boot 3.5 / Java 21 / Maven. Ingests HL7 v2 and FHIR R4 JSON (validated with HAPI FHIR), runs it through
+Kafka stages (normalize, enrich, persist, plus clinical-note extraction), stores it encrypted in PostgreSQL and serves
+aggregated patient/cohort views over GraphQL. Cohorts and bulk exports respect per-patient consent; exports are
+Safe Harbor de-identified and audited. Also: audit logging, RBAC (Keycloak) and PHI-masked logs.
+
+Design decisions are recorded in [`docs/adr/`](docs/adr/).
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  C[Client / k6] -->|"HL7 v2 / FHIR JSON + JWT"| G["IngestGuardFilter<br/>rate limit + size limit"]
-  G --> I[IngestionService]
+  C[Client / k6] -->|"HL7 v2 / FHIR R4 JSON + JWT"| G["IngestGuardFilter<br/>rate limit + size limit"]
+  G --> I["IngestionService<br/>FHIR R4 validation (HAPI)"]
+  I -. "422 OperationOutcome (values redacted)" .-> C
   I --> R[(phi.raw)]
   R -->|Normalize| N[(phi.normalized)]
   N -->|Enrich| E[(phi.enriched)]
+  N -->|"Extract (notes -> facts)"| X[(phi.extracted)]
   E -->|Persist| P[(PostgreSQL<br/>AES-GCM columns + audit)]
-  Q[GraphQL / Dashboard] -->|"RBAC (Keycloak JWT)"| P
+  X -->|"Persist facts (MRN HMAC)"| P
+  Q[GraphQL / Dashboard] -->|"RBAC (Keycloak JWT)"| CG{"Consent gate<br/>COHORT scope"}
+  CG --> P
+  CL[Clinician] -->|"POST /api/v1/consent"| CS[(consent_event / consent_state)]
+  CS --> CG
+  A[Analyst] -->|"GET /api/v1/export/fhir/ndjson"| EG{"Consent gate<br/>EXPORT scope"}
+  P --> EG
+  EG --> D["Safe Harbor de-identifier<br/>18 categories"]
+  D --> O[/"FHIR NDJSON (audited)"/]
   K[Keycloak] -. JWKS .-> G
   I -. metrics/traces .-> M["Actuator :8081<br/>Prometheus, OTLP"]
   M --> Gr[Grafana / Jaeger]
@@ -52,7 +65,12 @@ Plain-text view:
 | Concern | Implementation |
 |---|---|
 | Ingestion | `api/IngestController`, `api/IngestionService` (also `POST /api/v1/synthetic?count=N` to generate + ingest fake patients) |
-| Kafka stages | `kafka/PipelineStages` (3 `@KafkaListener`s), topics `phi.raw`, `phi.normalized`, `phi.enriched` |
+| Kafka stages | `kafka/PipelineStages` (3 `@KafkaListener`s), topics `phi.raw`, `phi.normalized`, `phi.enriched`, `phi.extracted` |
+| FHIR R4 validation | `fhir/FhirR4Validator` (HAPI FHIR profile validation); invalid bundles get `422` + a FHIR `OperationOutcome` with severity, issue type and element path only (quoted values redacted). See ADR 0001 |
+| Clinical-note extraction | `extract/*`: `ExtractionStage` consumes `phi.normalized`, runs a pluggable `Extractor` (default `RuleBasedExtractor`: ICD-10 diagnoses, medications with negation handling, cancer stage) and publishes `ExtractionEvent`s to `phi.extracted`; facts are persisted keyed by MRN HMAC (`clinical_extraction`, Flyway V2). Note text is never stored or logged. GraphQL `CohortFilter` gains `extractedDiagnosis`, `medication`, `stage` |
+| De-identification | `deid/SafeHarborDeidentifier`: all 18 HIPAA Safe Harbor categories (45 CFR 164.514(b)(2)(i)) for FHIR resources and free text; see ADR 0002 |
+| Export | `export/ExportController`: `GET /api/v1/export/fhir/ndjson?limit=N` (role ANALYST) streams de-identified Patient/Condition/Observation resources as NDJSON; `EXPORT_FHIR_NDJSON_START/DONE` audit entries written before and after the stream |
+| Consent | `consent/*`: `POST /api/v1/consent` (role CLINICIAN) records GRANTED/WITHDRAWN per patient and scope (`COHORT`, `EXPORT`) in an append-only `consent_event` log plus effective `consent_state` (Flyway V3). Cohort queries and exports join against it; `app.consent.default-policy` = `OPT_OUT` (default, no record means included) or `REQUIRE_EXPLICIT`. See ADR 0003 |
 | Parsing | `parse/Hl7V2Parser` (MSH/PID/OBX/DG1), `parse/FhirJsonNormalizer` (Bundle: Patient/Observation/Condition) |
 | Enrichment | `enrich/EnrichmentService`: age band (`0-17 ... 80+`), ICD-10/LOINC display lookup |
 | Storage | `store/*`, `db/migration/V1__init.sql` (Flyway) |
@@ -65,12 +83,12 @@ Plain-text view:
 
 ### Roles
 
-| Role | REST ingest + synthetic | `patient(mrn)` | `cohort(...)` (de-identified) | `auditLog` |
-|---|:-:|:-:|:-:|:-:|
-| INGESTOR | yes | no | no | no |
-| CLINICIAN | no | yes | yes | no |
-| ANALYST | no | no | yes | no |
-| AUDITOR | no | no | no | yes |
+| Role | REST ingest + synthetic | `patient(mrn)` | `cohort(...)` (de-identified, consent-gated) | `auditLog` | NDJSON export | record consent |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|
+| INGESTOR | yes | no | no | no | no | no |
+| CLINICIAN | no | yes | yes | no | no | yes |
+| ANALYST | no | no | yes | no | yes | no |
+| AUDITOR | no | no | no | yes | no | no |
 
 Dev users (realm `healthcare`, see `docker/keycloak/healthcare-realm.json`): `ingestor1`, `clinician1`,
 `analyst1`, `auditor1`; passwords are random per machine (generated into `.env`, see "Secrets and keys"). Client `pipeline-client` (public; auth code + PKCE, and
@@ -134,6 +152,16 @@ curl -s -H "Authorization: Bearer $CLIN_TOKEN" -H 'Content-Type: application/jso
   "query":"{ cohort(filter:{diagnosisCode:\"E11\", ageBand:\"50-64\"}){ totalPatients byAgeBand{key count} byDiagnosis{key count} } }"}'
 ```
 
+Record consent (`clinician1`) and export a de-identified, consent-filtered FHIR NDJSON file (`analyst1`):
+
+```bash
+curl -X POST -H "Authorization: Bearer $CLIN_TOKEN" -H 'Content-Type: application/json' localhost:8080/api/v1/consent \
+  -d '{"mrn":"SYN-123456","scope":"EXPORT","status":"WITHDRAWN"}'          # scope: COHORT | EXPORT; status: GRANTED | WITHDRAWN
+curl -H "Authorization: Bearer $ANALYST_TOKEN" "localhost:8080/api/v1/export/fhir/ndjson?limit=500" -o export.ndjson
+```
+
+An invalid FHIR bundle posted to `/api/v1/ingest/fhir` returns `422` with `application/fhir+json` `OperationOutcome`.
+
 Or open http://localhost:8080/ and sign in (cohort dashboard; panels depend on role).
 
 ## Observability and container
@@ -158,7 +186,9 @@ Or open http://localhost:8080/ and sign in (cohort dashboard; panels depend on r
 
 | Layer | What | Command | Needs Docker |
 |---|---|---|:-:|
-| Unit | HL7/FHIR parsing, masking, AES-GCM, enrichment, synthetic generator, Kafka stage wiring (Mockito), ingestion service, store service, role converter, REST security with mock JWT (`@WebMvcTest`), GraphQL RBAC (`@GraphQlTest`) | `mvn test` (or `make test`) | no |
+| Unit | HL7/FHIR parsing, FHIR R4 validation, masking, AES-GCM, enrichment, note extraction, Safe Harbor de-identification (one case per category), consent decisions, NDJSON export, synthetic generator, Kafka stage wiring (Mockito), ingestion service, store service, role converter, REST security with mock JWT (`@WebMvcTest`), GraphQL RBAC (`@GraphQlTest`) | `mvn test` (or `make test`) | no |
+| Property-based | jqwik (`*PropertyTest`): HL7 parser never throws anything but `MessageParseException` and round-trips PID fields; masked logs never contain generated SSN/MRN/DOB; Safe Harbor output (free text and FHIR bundles) contains no generated identifier from any category; AES-GCM round trip, tamper detection, wrong key and key rotation | `mvn test` | no |
+| Architecture | ArchUnit (`arch/ArchitectureTest`): package boundaries (model/crypto/deid/logging/parse are leaf layers), no controller to repository access, no PHI entities in controllers, no `System.out`/`java.util.logging`, methods that log must not read PHI accessors | `mvn test` | no |
 | Coverage | JaCoCo report in `target/site/jacoco/index.html` (unit) and `jacoco-it` (integration) | `mvn verify -DskipITs` / `mvn verify` | no / yes |
 | Integration + API | `*IT` classes (Failsafe) with Testcontainers Postgres, Kafka and Keycloak (same realm export): full pipeline REST->Kafka->Postgres, encrypted-at-rest check, REST + GraphQL role matrix with real Keycloak JWTs, audit-log assertions | `mvn verify` (or `make it`) | yes |
 | E2E UI | Playwright (`e2e/`): Keycloak login, per-role panels, cohort filters, audit view, synthetic ingest | `make up && make run`, then `make e2e` (first `make e2e-install`); or `make e2e-local` / `scripts/e2e.sh` for all-in-one | yes |
@@ -172,8 +202,9 @@ Note: the unit tests set `-Dnet.bytebuddy.experimental=true` so Mockito works on
 
 ```
 docker-compose.yml, docker/keycloak/healthcare-realm.json
-src/main/java/com/example/hdip/{api,audit,config,crypto,enrich,graphql,kafka,logging,model,parse,security,store,synthetic}
+src/main/java/com/example/hdip/{api,audit,config,consent,crypto,deid,enrich,export,extract,fhir,graphql,kafka,logging,model,parse,security,store,synthetic}
 src/main/resources/{application.yml,logback-spring.xml,db/migration,graphql,static}
-src/test/java/...            unit tests (*Test) and Testcontainers integration tests (it/*IT)
+src/test/java/...            unit (*Test), property (*PropertyTest), architecture and Testcontainers integration tests (it/*IT)
+docs/adr/                    architecture decision records
 e2e/                         Playwright tests
 ```
