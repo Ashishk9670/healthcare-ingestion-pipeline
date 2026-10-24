@@ -36,7 +36,7 @@ jobs:
       - name: Generate CycloneDX SBOM
         run: mvn -B -q org.cyclonedx:cyclonedx-maven-plugin:2.9.0:makeAggregateBom
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true

@@ -117,7 +117,7 @@ jobs:
           docker run --rm -v "$PWD/docker/observability/alloy/config.alloy:/c.alloy:ro" grafana/alloy:v1.5.1 fmt /c.alloy > /dev/null
       - uses: docker/setup-buildx-action@v3
       - name: Build image (not pushed)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
