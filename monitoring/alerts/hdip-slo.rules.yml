@@ -1,0 +1,65 @@
+# Prometheus alert rules for the HDIP pipeline. Metric names come from PipelineMetrics (tags are fixed enums, no PHI).
+# SLOs (see docs/runbooks):
+#   - stage latency:   p95 of every pipeline stage below 1s (5m window)
+#   - stage errors:    at least 99% of stage executions succeed (error budget 1%)
+#   - consumer lag:    no Kafka consumer more than 1000 records behind for 10m
+# Validate: promtool check rules monitoring/alerts/hdip-slo.rules.yml; promtool test rules monitoring/alerts/hdip-slo.rules.test.yml
+groups:
+  - name: hdip-recording
+    rules:
+      - record: hdip:stage_latency_seconds:p95_5m
+        expr: histogram_quantile(0.95, sum by (le, stage) (rate(hdip_pipeline_stage_duration_seconds_bucket[5m])))
+      - record: hdip:stage_error_ratio:5m
+        expr: |
+          sum by (stage) (rate(hdip_pipeline_messages_total{outcome="failure"}[5m]))
+            /
+          sum by (stage) (rate(hdip_pipeline_messages_total[5m]))
+      - record: hdip:stage_error_ratio:1h
+        expr: |
+          sum by (stage) (rate(hdip_pipeline_messages_total{outcome="failure"}[1h]))
+            /
+          sum by (stage) (rate(hdip_pipeline_messages_total[1h]))
+
+  - name: hdip-slo
+    rules:
+      - alert: HdipStageLatencyP95High
+        expr: hdip:stage_latency_seconds:p95_5m > 1
+        for: 10m
+        labels: { severity: warning, slo: stage-latency }
+        annotations:
+          summary: "p95 latency of pipeline stage {{ $labels.stage }} is above 1s"
+          runbook_url: https://github.com/Ashishk9670/healthcare-ingestion-pipeline/blob/main/docs/runbooks/stage-latency.md
+
+      - alert: HdipStageErrorRateHigh
+        expr: hdip:stage_error_ratio:5m > 0.05
+        for: 10m
+        labels: { severity: warning, slo: stage-errors }
+        annotations:
+          summary: "More than 5% of {{ $labels.stage }} executions are failing"
+          runbook_url: https://github.com/Ashishk9670/healthcare-ingestion-pipeline/blob/main/docs/runbooks/stage-errors.md
+
+      # Fast burn of the 99% success SLO: 14.4x budget consumption over both 5m and 1h.
+      - alert: HdipStageErrorBudgetFastBurn
+        expr: hdip:stage_error_ratio:5m > (14.4 * 0.01) and hdip:stage_error_ratio:1h > (14.4 * 0.01)
+        for: 2m
+        labels: { severity: critical, slo: stage-errors }
+        annotations:
+          summary: "Stage {{ $labels.stage }} is burning its error budget at more than 14x"
+          runbook_url: https://github.com/Ashishk9670/healthcare-ingestion-pipeline/blob/main/docs/runbooks/stage-errors.md
+
+      - alert: HdipConsumerLagHigh
+        expr: max by (client_id) (kafka_consumer_fetch_manager_records_lag_max) > 1000
+        for: 10m
+        labels: { severity: warning, slo: consumer-lag }
+        annotations:
+          summary: "Kafka consumer {{ $labels.client_id }} is more than 1000 records behind"
+          runbook_url: https://github.com/Ashishk9670/healthcare-ingestion-pipeline/blob/main/docs/runbooks/consumer-lag.md
+
+      # The scrape config lists a compose target and a host target; only one is expected to be up at a time.
+      - alert: HdipAppDown
+        expr: max(up{job="hdip-app"}) == 0
+        for: 2m
+        labels: { severity: critical, slo: availability }
+        annotations:
+          summary: "No HDIP application instance is being scraped successfully"
+          runbook_url: https://github.com/Ashishk9670/healthcare-ingestion-pipeline/blob/main/docs/runbooks/app-down.md

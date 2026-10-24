@@ -174,6 +174,11 @@ Or open http://localhost:8080/ and sign in (cohort dashboard; panels depend on r
   `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`. A `PhiSafeObservationFilter` masks PHI-looking values in span attributes.
 - `docker compose --profile observability up -d` adds Prometheus :9090, Grafana :3000 (admin password
   `GRAFANA_ADMIN_PASSWORD` from `.env`, provisioned dashboard "HDIP pipeline") and Jaeger :16686.
+- `docker compose --profile app --profile monitoring up -d --build` adds Loki :3100 (logs), Tempo :3200 (traces), Alloy (ships only
+  the app container's stdout, which is already PHI-masked, through a second redaction stage; `LogShippingPhiRedactionTest` proves
+  both layers) plus Prometheus and Grafana with Loki/Tempo datasources. SLO alert rules live in `monitoring/alerts/`
+  (stage latency, stage error rate and budget burn, consumer lag, app down; `promtool test rules` in CI), with runbooks in
+  `docs/runbooks/`. For traces set `OTEL_TRACING_SAMPLING=0.1` and `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces`.
 - `docker compose --profile app up -d --build` runs the app itself from the multi-stage, non-root `Dockerfile`.
 
 ## Kubernetes and releases

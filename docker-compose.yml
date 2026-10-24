@@ -71,7 +71,7 @@ services:
       PHI_ACTIVE_KEY_ID: ${PHI_ACTIVE_KEY_ID:-}
       PHI_HMAC_KEY: ${PHI_HMAC_KEY:?run scripts/gen-dev-env.sh}
       OTEL_TRACING_SAMPLING: ${OTEL_TRACING_SAMPLING:-0.0}
-      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://jaeger:4318/v1/traces
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-http://jaeger:4318/v1/traces}   # monitoring profile: http://tempo:4318/v1/traces
     ports: ["8080:8080"]   # API; actuator (8081) stays on the compose network only
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health/readiness | grep -q UP"]
@@ -81,15 +81,16 @@ services:
 
   # ---- optional: metrics + dashboards + traces (docker compose --profile observability up -d) ----
   prometheus:
-    profiles: ["observability"]
+    profiles: ["observability", "monitoring"]
     image: prom/prometheus:v2.55.1
     volumes:
       - ./docker/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts:/etc/prometheus/rules:ro   # SLO alert rules (promtool-tested in CI)
     ports: ["9090:9090"]
     extra_hosts: ["host.docker.internal:host-gateway"]   # scrape the app when run on the host (mvn spring-boot:run)
 
   grafana:
-    profiles: ["observability"]
+    profiles: ["observability", "monitoring"]
     image: grafana/grafana:11.3.0
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?run scripts/gen-dev-env.sh}
@@ -107,3 +108,38 @@ services:
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
     ports: ["16686:16686", "4318:4318"]
+
+  # ---- optional: logs + traces + alerts (docker compose --profile app --profile monitoring up -d --build) ----
+  # Adds Loki (logs), Alloy (ships ONLY the app container's masked stdout, with a second PHI redaction stage) and Tempo (traces).
+  # Prometheus and Grafana come with this profile too. Set OTEL_TRACING_SAMPLING=0.1 and
+  # OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces to send traces to Tempo.
+  loki:
+    profiles: ["monitoring"]
+    image: grafana/loki:3.2.1
+    command: ["-config.file=/etc/loki/loki-config.yaml"]
+    volumes:
+      - ./docker/observability/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki-data:/loki
+    ports: ["127.0.0.1:3100:3100"]
+
+  alloy:
+    profiles: ["monitoring"]
+    image: grafana/alloy:v1.5.1
+    command: ["run", "--server.http.listen-addr=0.0.0.0:12345", "--storage.path=/var/lib/alloy/data", "/etc/alloy/config.alloy"]
+    volumes:
+      - ./docker/observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro   # dev only: lets Alloy read container logs
+    depends_on: [loki]
+
+  tempo:
+    profiles: ["monitoring"]
+    image: grafana/tempo:2.6.1
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./docker/observability/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports: ["127.0.0.1:3200:3200"]
+
+volumes:
+  loki-data:
+  tempo-data:

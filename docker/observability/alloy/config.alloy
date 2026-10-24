@@ -1,0 +1,65 @@
+// Ships ONLY the app container's stdout to Loki. The app already masks PHI in its log layout
+// (logback-spring.xml: %mask / %maskEx). The loki.process stage below is a second, independent
+// redaction layer: if a line ever reaches the pipeline with a PHI-looking token, it is redacted
+// before it is written to Loki. Each expression has exactly one capture group, which is replaced.
+// LogShippingPhiRedactionTest applies these same expressions to synthetic PHI lines.
+
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "app_only" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    regex         = "app"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+}
+
+loki.source.docker "app" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.app_only.output
+  labels     = { job = "hdip" }
+  forward_to = [loki.process.redact_phi.receiver]
+}
+
+loki.process "redact_phi" {
+  // US SSN
+  stage.replace {
+    expression = `\b(\d{3}-\d{2}-\d{4})\b`
+    replace    = "***"
+  }
+
+  // MRN-like tokens (MRN-123456, SYN-123456, SYN-CHAOS-x-1 style ids are covered by the app masker)
+  stage.replace {
+    expression = `\b((?:MRN|SYN)[-_]?\d{3,})\b`
+    replace    = "***"
+  }
+
+  // HL7 PHI segments: keep the segment id, drop the content
+  stage.replace {
+    expression = `\b(?:PID|NK1|IN1|GT1)\|([^\r\n]*)`
+    replace    = "***"
+  }
+
+  // key=value / "key":"value" style identifiers
+  stage.replace {
+    expression = `(?i)\b(?:family[_ ]?name|given[_ ]?name|first[_ ]?name|last[_ ]?name|patient[_ ]?name|ssn|dob|birth[_ ]?date|mrn)\b"?\s*[:=]\s*"?([^",;}\s\]]+)`
+    replace    = "***"
+  }
+
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
