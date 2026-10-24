@@ -46,7 +46,7 @@ import static org.awaitility.Awaitility.await;
  * no plaintext PHI reaches the database columns, audit details or the (masked) log output, and the pipeline recovers.
  * SYNTHETIC DATA ONLY. The app talks to both dependencies through the proxies; assertions use direct connections.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @ExtendWith(OutputCaptureExtension.class)
 class ChaosIT {
