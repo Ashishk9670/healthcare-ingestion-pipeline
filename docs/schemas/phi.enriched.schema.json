@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hdip.example/schemas/phi.enriched.schema.json",
+  "title": "EnrichedRecord (topic phi.enriched)",
+  "description": "Canonical record plus derived attributes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["record", "ageBand", "enrichedAt"],
+  "properties": {
+    "record": { "$ref": "https://hdip.example/schemas/phi.normalized.schema.json" },
+    "ageBand": { "enum": ["0-17", "18-34", "35-49", "50-64", "65-79", "80+", "unknown"] },
+    "enrichedAt": { "type": "string", "format": "date-time" }
+  }
+}

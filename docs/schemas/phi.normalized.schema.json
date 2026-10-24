@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hdip.example/schemas/phi.normalized.schema.json",
+  "title": "CanonicalRecord (topic phi.normalized)",
+  "description": "Canonical patient, observations, diagnoses and transient free-text notes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["messageId", "source", "patient", "observations", "diagnoses", "notes"],
+  "properties": {
+    "messageId": { "type": "string", "minLength": 1 },
+    "source": { "enum": ["HL7V2", "FHIR_JSON"] },
+    "patient": { "$ref": "#/$defs/patient" },
+    "observations": { "type": "array", "items": { "$ref": "#/$defs/observation" } },
+    "diagnoses": { "type": "array", "items": { "$ref": "#/$defs/diagnosis" } },
+    "notes": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "patient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mrn"],
+      "properties": {
+        "mrn": { "type": "string", "minLength": 1 },
+        "familyName": { "type": ["string", "null"] },
+        "givenName": { "type": ["string", "null"] },
+        "birthDate": { "type": ["string", "null"], "format": "date" },
+        "gender": { "type": ["string", "null"] },
+        "ssn": { "type": ["string", "null"] }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {
+        "code": { "type": "string" },
+        "system": { "type": ["string", "null"] },
+        "display": { "type": ["string", "null"] },
+        "valueText": { "type": ["string", "null"] },
+        "valueNumeric": { "type": ["number", "null"] },
+        "unit": { "type": ["string", "null"] },
+        "effectiveAt": { "type": ["string", "null"], "format": "date-time" }
+      }
+    },
+    "diagnosis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {
+        "code": { "type": "string" },
+        "system": { "type": ["string", "null"] },
+        "display": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
