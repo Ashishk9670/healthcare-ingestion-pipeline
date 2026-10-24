@@ -164,6 +164,18 @@ An invalid FHIR bundle posted to `/api/v1/ingest/fhir` returns `422` with `appli
 
 Or open http://localhost:8080/ and sign in (cohort dashboard; panels depend on role).
 
+## Demo
+
+`make demo` starts Postgres, Kafka and Keycloak, runs the app, seeds 40 synthetic patients through the real pipeline and prints
+the dev login instructions (dev users `clinician1`, `analyst1`, `auditor1`, `ingestor1`; random passwords are in your local `.env`).
+
+| Clinician: cohort + lookup | Analyst: aggregates only | Auditor: audit log |
+|---|---|---|
+| ![clinician](docs/img/dashboard-clinician.png) | ![analyst](docs/img/dashboard-analyst.png) | ![auditor](docs/img/dashboard-auditor.png) |
+
+Screenshots are captured by Playwright (`e2e/tests/screenshots.spec.ts`, opt-in via `CAPTURE_SCREENSHOTS=1`; the CI e2e job uploads
+them as an artifact) from synthetic data only; the patient detail view is deliberately not captured.
+
 ## Observability and container
 
 - Actuator runs on a separate management port (`MANAGEMENT_PORT`, default 8081; keep it off public networks):
