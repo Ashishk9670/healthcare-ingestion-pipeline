@@ -49,18 +49,23 @@ public class ExtractionStage {
     @KafkaListener(topics = Topics.NORMALIZED, groupId = "hdip-extractor")
     public void onNormalized(String json) throws Exception {
         metrics.timeStage(Stage.EXTRACT, () -> {
-            CanonicalRecord rec = mapper.readValue(json, CanonicalRecord.class);
-            if (rec.notes().isEmpty() || rec.patient() == null || rec.patient().mrn() == null) return null;
-            Map<String, ExtractedFact> facts = new LinkedHashMap<>();
-            for (String note : rec.notes()) {
-                for (ExtractedFact f : extractor.extract(note)) facts.putIfAbsent(f.kind() + ":" + f.value(), f);
-            }
-            if (facts.isEmpty()) return null;
-            var ev = new ExtractionEvent(rec.messageId(), cipher.hmac(rec.patient().mrn()), new ArrayList<>(facts.values()), Instant.now(clock));
-            kafka.send(Topics.EXTRACTED, rec.messageId(), mapper.writeValueAsString(ev));
-            log.info("Extracted {} facts for message {}", facts.size(), rec.messageId());
+            ExtractionEvent ev = buildEvent(mapper.readValue(json, CanonicalRecord.class));
+            if (ev == null) return null;
+            kafka.send(Topics.EXTRACTED, ev.messageId(), mapper.writeValueAsString(ev));
+            log.info("Extracted {} facts for message {}", ev.facts().size(), ev.messageId());
             return null;
         });
+    }
+
+    /** Reads PHI (notes, MRN) but never logs; kept separate from the logging code path (enforced by ArchitectureTest). */
+    private ExtractionEvent buildEvent(CanonicalRecord rec) {
+        if (rec.notes().isEmpty() || rec.patient() == null || rec.patient().mrn() == null) return null;
+        Map<String, ExtractedFact> facts = new LinkedHashMap<>();
+        for (String note : rec.notes()) {
+            for (ExtractedFact f : extractor.extract(note)) facts.putIfAbsent(f.kind() + ":" + f.value(), f);
+        }
+        if (facts.isEmpty()) return null;
+        return new ExtractionEvent(rec.messageId(), cipher.hmac(rec.patient().mrn()), new ArrayList<>(facts.values()), Instant.now(clock));
     }
 
     @KafkaListener(topics = Topics.EXTRACTED, groupId = "hdip-extraction-persister")
