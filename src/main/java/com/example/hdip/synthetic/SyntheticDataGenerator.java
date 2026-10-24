@@ -36,6 +36,8 @@ public class SyntheticDataGenerator {
             {"asthma", "albuterol inhaler as needed"},
             {"chronic kidney disease stage 3", "atorvastatin 20 mg nightly"},
             {"breast cancer", "tamoxifen 20 mg daily"}};
+    /** FHIR dateTime requires seconds when a time is present (OffsetDateTime.toString() drops zero seconds). */
+    private static final DateTimeFormatter FHIR_DATETIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX");
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private final Random random;
@@ -173,7 +175,7 @@ public class SyntheticDataGenerator {
             ob.putObject("code").putArray("coding").addObject()
                     .put("system", "http://loinc.org").put("code", o[0]).put("display", o[1]);
             ob.putObject("valueQuantity").put("value", Double.parseDouble(o[3])).put("unit", o[2]);
-            ob.put("effectiveDateTime", java.time.OffsetDateTime.now(ZoneOffset.UTC).withNano(0).toString());
+            ob.put("effectiveDateTime", java.time.OffsetDateTime.now(ZoneOffset.UTC).format(FHIR_DATETIME));
         }
         return bundle.toString();
     }

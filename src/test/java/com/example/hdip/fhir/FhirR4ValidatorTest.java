@@ -22,7 +22,7 @@ class FhirR4ValidatorTest {
 
     @Test
     void syntheticBundlesAreValid() {
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 60; i++) {
             OperationOutcome oo = validator.validate(gen.fhirBundle());
             assertThat(oo).as("synthetic bundle %d", i).isNull();
         }
