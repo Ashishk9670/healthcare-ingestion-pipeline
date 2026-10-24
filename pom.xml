@@ -26,6 +26,7 @@
     <httpcore5.version>5.4.3</httpcore5.version>
     <httpclient5.version>5.6.4</httpclient5.version>
     <jacoco.minimum>0.70</jacoco.minimum>
+    <pit.mutation.threshold>70</pit.mutation.threshold>
     <hapi.version>8.12.1</hapi.version>
     <jqwik.version>1.9.3</jqwik.version>
     <archunit.version>1.4.1</archunit.version>
@@ -157,4 +158,51 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <!-- Mutation testing (optional, slow): mvn -B -Pmutation test-compile org.pitest:pitest-maven:mutationCoverage -->
+    <profile>
+      <id>mutation</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.pitest</groupId>
+            <artifactId>pitest-maven</artifactId>
+            <version>1.30.1</version>
+            <dependencies>
+              <dependency>
+                <groupId>org.pitest</groupId>
+                <artifactId>pitest-junit5-plugin</artifactId>
+                <version>1.2.3</version>
+              </dependency>
+            </dependencies>
+            <configuration>
+              <targetClasses>
+                <param>com.example.hdip.parse.*</param>
+                <param>com.example.hdip.logging.*</param>
+                <param>com.example.hdip.deid.*</param>
+                <param>com.example.hdip.consent.*</param>
+                <param>com.example.hdip.crypto.*</param>
+              </targetClasses>
+              <targetTests>
+                <param>com.example.hdip.parse.*</param>
+                <param>com.example.hdip.logging.*</param>
+                <param>com.example.hdip.deid.*</param>
+                <param>com.example.hdip.consent.*</param>
+                <param>com.example.hdip.crypto.*</param>
+              </targetTests>
+              <excludedTestClasses><param>*IT</param></excludedTestClasses>
+              <threads>2</threads>
+              <timeoutConstant>8000</timeoutConstant>
+              <outputFormats><param>HTML</param><param>XML</param></outputFormats>
+              <timestampedReports>false</timestampedReports>
+              <jvmArgs><jvmArg>-Dnet.bytebuddy.experimental=true</jvmArg><jvmArg>-XX:+EnableDynamicAgentLoading</jvmArg></jvmArgs>
+              <!-- Set from the first measured score (see docs/mutation-testing.md) -->
+              <mutationThreshold>${pit.mutation.threshold}</mutationThreshold>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>
