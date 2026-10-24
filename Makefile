@@ -1,4 +1,4 @@
-.PHONY: env build test it verify coverage up down run e2e-install e2e e2e-local clean
+.PHONY: demo env build test it verify coverage up down run e2e-install e2e e2e-local clean
 
 build:            ## compile + package (skip tests)
 	mvn -B -q -DskipTests package
@@ -38,3 +38,6 @@ e2e-local:        ## everything: compose up, start app, run Playwright, tear dow
 
 clean:
 	mvn -B clean
+
+demo: env         ## stack up + app + seed SYNTHETIC patients + print dev login instructions
+	./scripts/demo.sh
