@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hdip.fullname" . }}
+  labels:
+    {{- include "hdip.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "hdip.selectorLabels" . | nindent 4 }}
+  ports:
+    # only the API port is exposed; the management port (8081) is reachable by pod IP for probes and Prometheus
+    - { name: http, port: {{ .Values.service.port }}, targetPort: http }

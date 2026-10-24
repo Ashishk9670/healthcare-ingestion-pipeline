@@ -1,0 +1,7 @@
+apiVersion: v2
+name: hdip
+description: Healthcare data ingestion pipeline (SYNTHETIC DATA ONLY). Postgres, Kafka and Keycloak are provided by the platform.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.27.0-0"

@@ -138,3 +138,27 @@ jobs:
           docker run --rm -v "$PWD/deploy/k8s:/manifests:ro" ghcr.io/yannh/kubeconform:v0.6.7 \
             -strict -summary -kubernetes-version 1.30.0 \
             -ignore-filename-pattern 'kustomization\.yaml' /manifests
+
+  helm-chart:
+    name: Helm chart (lint + kubeconform)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with: { version: v3.16.4 }
+      - name: helm lint
+        run: |
+          helm lint deploy/helm/hdip
+          helm lint deploy/helm/hdip -f deploy/helm/hdip/ci/values-all-features.yaml
+      - name: helm template | kubeconform (default and all-features values)
+        run: |
+          CRDS='https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+          for values in "" "-f deploy/helm/hdip/ci/values-all-features.yaml"; do
+            helm template hdip deploy/helm/hdip $values | docker run --rm -i ghcr.io/yannh/kubeconform:v0.6.7 \
+              -strict -summary -kubernetes-version 1.30.0 -schema-location default -schema-location "$CRDS" -
+          done
+      - name: Validate examples (External Secrets, Sealed Secrets, Argo CD)
+        run: |
+          CRDS='https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+          docker run --rm -v "$PWD/deploy/helm/examples:/e:ro" -v "$PWD/deploy/argocd:/a:ro" ghcr.io/yannh/kubeconform:v0.6.7 \
+            -strict -summary -kubernetes-version 1.30.0 -schema-location default -schema-location "$CRDS" /e /a

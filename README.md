@@ -184,6 +184,8 @@ Or open http://localhost:8080/ and sign in (cohort dashboard; panels depend on r
 ## Kubernetes and releases
 
 - `deploy/k8s/` holds hardened manifests (kustomize); CI validates them with kubeconform. See `deploy/k8s/README.md`.
+- `deploy/helm/hdip` is a Helm chart with the same hardening (see `deploy/helm/README.md`): External Secrets / Sealed Secrets examples
+  (placeholders only) and an Argo CD `Application` in `deploy/argocd/`. CI runs `helm lint` and `helm template | kubeconform`.
 - Pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml` and publishes `ghcr.io/ashishk9670/healthcare-ingestion-pipeline`.
 - Load test: `loadtest/` (k6).
 

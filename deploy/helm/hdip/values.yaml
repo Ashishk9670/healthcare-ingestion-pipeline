@@ -1,0 +1,86 @@
+# SYNTHETIC DATA ONLY. No secrets live in this file: the pod reads PHI keys and the DB password from an existing Secret
+# (see existingSecret, or enable externalSecret to have External Secrets create it from your secret manager).
+image:
+  repository: ghcr.io/ashishk9670/healthcare-ingestion-pipeline
+  tag: ""            # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+replicaCount: 2      # ignored when autoscaling.enabled
+
+serviceAccount:
+  create: true
+  name: ""
+
+# Non-secret application config (rendered into a ConfigMap, injected via envFrom)
+config:
+  DB_URL: jdbc:postgresql://postgres.hdip.svc:5432/hdip
+  DB_USER: hdip
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka.hdip.svc:9092
+  KEYCLOAK_ISSUER: https://keycloak.example.test/realms/healthcare
+  KEYCLOAK_JWK_SET_URI: http://keycloak.hdip.svc:8080/realms/healthcare/protocol/openid-connect/certs
+  MANAGEMENT_PORT: "8081"
+  OTEL_TRACING_SAMPLING: "0.0"
+  INGEST_RATE_LIMIT_RPM: "600"
+  INGEST_RATE_LIMIT_BURST: "100"
+
+# Name of the Secret with DB_PASSWORD, PHI_ENCRYPTION_KEYS, PHI_ACTIVE_KEY_ID, PHI_HMAC_KEY.
+existingSecret: hdip-secrets
+
+# Optional: create that Secret with External Secrets Operator (CRD must be installed). Keys below are remote reference
+# names in your secret store, never values.
+externalSecret:
+  enabled: false
+  apiVersion: external-secrets.io/v1beta1
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: example-secret-store
+  remoteRefs:
+    DB_PASSWORD: hdip/db-password
+    PHI_ENCRYPTION_KEYS: hdip/phi-encryption-keys
+    PHI_ACTIVE_KEY_ID: hdip/phi-active-key-id
+    PHI_HMAC_KEY: hdip/phi-hmac-key
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources:
+  requests: { cpu: 250m, memory: 512Mi }
+  limits: { cpu: "1", memory: 1Gi }
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+  monitoringNamespace: monitoring   # may scrape the management port
+  egressPorts: [5432, 9092, 8080]   # Postgres, Kafka, Keycloak (to pods in the same namespace)
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8081"
+  prometheus.io/path: /actuator/prometheus
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile: { type: RuntimeDefault }
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: { drop: ["ALL"] }
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
