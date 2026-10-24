@@ -27,6 +27,8 @@
     <httpclient5.version>5.6.4</httpclient5.version>
     <jacoco.minimum>0.70</jacoco.minimum>
     <hapi.version>8.12.1</hapi.version>
+    <jqwik.version>1.9.3</jqwik.version>
+    <archunit.version>1.4.1</archunit.version>
     <testcontainers.version>1.21.3</testcontainers.version>
     <!-- Lets Mockito/ByteBuddy run on newer JDKs than the one it was built against -->
     <test.argLine>-Dnet.bytebuddy.experimental=true -XX:+EnableDynamicAgentLoading</test.argLine>
@@ -67,6 +69,8 @@
     <dependency><groupId>org.testcontainers</groupId><artifactId>kafka</artifactId><version>${testcontainers.version}</version><scope>test</scope></dependency>
     <dependency><groupId>com.github.dasniko</groupId><artifactId>testcontainers-keycloak</artifactId><version>3.8.0</version><scope>test</scope></dependency>
     <dependency><groupId>org.awaitility</groupId><artifactId>awaitility</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>net.jqwik</groupId><artifactId>jqwik</artifactId><version>${jqwik.version}</version><scope>test</scope></dependency>
+    <dependency><groupId>com.tngtech.archunit</groupId><artifactId>archunit-junit5</artifactId><version>${archunit.version}</version><scope>test</scope></dependency>
   </dependencies>
 
   <build>
