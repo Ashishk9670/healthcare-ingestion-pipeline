@@ -30,7 +30,7 @@
     <hapi.version>8.12.1</hapi.version>
     <jqwik.version>1.9.3</jqwik.version>
     <archunit.version>1.4.1</archunit.version>
-    <testcontainers.version>1.21.3</testcontainers.version>
+    <testcontainers.version>1.21.4</testcontainers.version>
     <!-- Lets Mockito/ByteBuddy run on newer JDKs than the one it was built against -->
     <test.argLine>-Dnet.bytebuddy.experimental=true -XX:+EnableDynamicAgentLoading</test.argLine>
   </properties>
