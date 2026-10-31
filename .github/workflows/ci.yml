@@ -15,13 +15,13 @@ jobs:
         with: { distribution: temurin, java-version: '21', cache: maven }
       - name: Compile, unit test, coverage
         run: mvn -B verify -DskipITs
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: jacoco-unit-report
           path: target/site/jacoco/
           if-no-files-found: ignore
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: surefire-reports
@@ -38,7 +38,7 @@ jobs:
         with: { distribution: temurin, java-version: '21', cache: maven }
       - name: Run *IT tests (Postgres, Kafka, Keycloak via Testcontainers)
         run: mvn -B verify
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: failsafe-reports
@@ -83,12 +83,12 @@ jobs:
       - name: Capture README screenshots (synthetic data only)
         working-directory: e2e
         run: CAPTURE_SCREENSHOTS=1 npx playwright test screenshots.spec.ts
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: readme-screenshots
           path: docs/img/*.png
           if-no-files-found: ignore
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report
@@ -180,7 +180,7 @@ jobs:
         with: { distribution: temurin, java-version: '21', cache: maven }
       - name: Generate CycloneDX SBOM
         run: mvn -B -q org.cyclonedx:cyclonedx-maven-plugin:2.9.0:makeAggregateBom
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sbom-cyclonedx
           path: |
