@@ -6,6 +6,7 @@ import com.example.hdip.enrich.EnrichmentService;
 import com.example.hdip.extract.ExtractionStage;
 import com.example.hdip.extract.ExtractionStore;
 import com.example.hdip.extract.RuleBasedExtractor;
+import com.example.hdip.kafka.AckedKafka;
 import com.example.hdip.kafka.PipelineStages;
 import com.example.hdip.kafka.Topics;
 import com.example.hdip.model.RawMessage;
@@ -82,8 +83,8 @@ class PipelineEventContractTest {
         var norm = new NormalizationService(new Hl7V2Parser(), new FhirJsonNormalizer(mapper));
         var enrich = new EnrichmentService(new CodingLookup(), clock);
         var metrics = new PipelineMetrics(new SimpleMeterRegistry());
-        stages = new PipelineStages(mapper, kafka, norm, enrich, store, metrics);
-        extraction = new ExtractionStage(mapper, kafka, new RuleBasedExtractor(), extractionStore, cipher, metrics, clock);
+        stages = new PipelineStages(mapper, AckedKafka.publisher(kafka), norm, enrich, store, metrics);
+        extraction = new ExtractionStage(mapper, AckedKafka.publisher(kafka), new RuleBasedExtractor(), extractionStore, cipher, metrics, clock);
     }
 
     private JsonSchema schema(String topic) {

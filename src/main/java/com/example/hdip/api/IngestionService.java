@@ -9,7 +9,8 @@ import com.example.hdip.observability.PipelineMetrics;
 import com.example.hdip.parse.MessageParseException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.kafka.core.KafkaTemplate;
+import com.example.hdip.kafka.KafkaPublisher;
+import com.example.hdip.kafka.PublishFailedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -19,13 +20,13 @@ import java.util.UUID;
 
 @Service
 public class IngestionService {
-    private final KafkaTemplate<String, String> kafka;
+    private final KafkaPublisher kafka;
     private final ObjectMapper mapper;
     private final AuditService audit;
     private final PipelineMetrics metrics;
     private final FhirR4Validator fhirValidator;
 
-    public IngestionService(KafkaTemplate<String, String> kafka, ObjectMapper mapper, AuditService audit, PipelineMetrics metrics,
+    public IngestionService(KafkaPublisher kafka, ObjectMapper mapper, AuditService audit, PipelineMetrics metrics,
                             FhirR4Validator fhirValidator) {
         this.fhirValidator = fhirValidator;
         this.kafka = kafka;
@@ -47,9 +48,12 @@ public class IngestionService {
         String by = auth == null ? "unknown" : auth.getName();
         try {
             RawMessage raw = new RawMessage(id, format, payload, Instant.now(), by);
-            kafka.send(Topics.RAW, id, mapper.writeValueAsString(raw));
+            kafka.publish(Topics.RAW, id, mapper.writeValueAsString(raw));
+        } catch (PublishFailedException e) {
+            metrics.ingestRejected("publish_failed");
+            throw e;
         } catch (Exception e) {
-            throw new IllegalStateException("Could not publish message", e);
+            throw new IllegalStateException("Could not serialise message", e);
         }
         metrics.ingestAccepted(format);
         audit.record("INGEST", "Message", id, "format=" + format + " bytes=" + payload.length());

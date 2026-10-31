@@ -9,7 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.core.KafkaTemplate;
+import com.example.hdip.kafka.KafkaPublisher;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -28,14 +28,14 @@ public class ExtractionStage {
     private static final Logger log = LoggerFactory.getLogger(ExtractionStage.class);
 
     private final ObjectMapper mapper;
-    private final KafkaTemplate<String, String> kafka;
+    private final KafkaPublisher kafka;
     private final Extractor extractor;
     private final ExtractionStore store;
     private final AesGcmFieldCipher cipher;
     private final PipelineMetrics metrics;
     private final Clock clock;
 
-    public ExtractionStage(ObjectMapper mapper, KafkaTemplate<String, String> kafka, Extractor extractor, ExtractionStore store,
+    public ExtractionStage(ObjectMapper mapper, KafkaPublisher kafka, Extractor extractor, ExtractionStore store,
                            AesGcmFieldCipher cipher, PipelineMetrics metrics, Clock clock) {
         this.mapper = mapper;
         this.kafka = kafka;
@@ -51,7 +51,7 @@ public class ExtractionStage {
         metrics.timeStage(Stage.EXTRACT, () -> {
             ExtractionEvent ev = buildEvent(mapper.readValue(json, CanonicalRecord.class));
             if (ev == null) return null;
-            kafka.send(Topics.EXTRACTED, ev.messageId(), mapper.writeValueAsString(ev));
+            kafka.publish(Topics.EXTRACTED, ev.messageId(), mapper.writeValueAsString(ev));
             log.info("Extracted {} facts for message {}", ev.facts().size(), ev.messageId());
             return null;
         });

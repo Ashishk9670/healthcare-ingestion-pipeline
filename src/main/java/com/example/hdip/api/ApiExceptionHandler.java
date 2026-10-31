@@ -1,6 +1,7 @@
 package com.example.hdip.api;
 
 import com.example.hdip.fhir.FhirValidationException;
+import com.example.hdip.kafka.PublishFailedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,13 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
                 .contentType(MediaType.parseMediaType("application/fhir+json"))
                 .body(e.operationOutcomeJson());
+    }
+
+    /** The broker did not acknowledge: nothing was accepted, so the client must retry. Never echoes payload or key. */
+    @ExceptionHandler(PublishFailedException.class)
+    ResponseEntity<ProblemDetail> notAccepted(PublishFailedException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).header("Retry-After", "5")
+                .body(ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, "Message not accepted, retry later"));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

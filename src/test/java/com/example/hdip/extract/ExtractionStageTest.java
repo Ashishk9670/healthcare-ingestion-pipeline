@@ -1,6 +1,7 @@
 package com.example.hdip.extract;
 
 import com.example.hdip.crypto.AesGcmFieldCipher;
+import com.example.hdip.kafka.AckedKafka;
 import com.example.hdip.kafka.Topics;
 import com.example.hdip.model.CanonicalPatient;
 import com.example.hdip.model.CanonicalRecord;
@@ -35,7 +36,7 @@ class ExtractionStageTest {
     final ObjectMapper mapper = JsonMapper.builder().findAndAddModules().build();
 
     ExtractionStage stage() {
-        return new ExtractionStage(mapper, kafka, new RuleBasedExtractor(), store, cipher, new PipelineMetrics(new SimpleMeterRegistry()),
+        return new ExtractionStage(mapper, AckedKafka.publisher(kafka), new RuleBasedExtractor(), store, cipher, new PipelineMetrics(new SimpleMeterRegistry()),
                 Clock.fixed(Instant.parse("2026-06-15T00:00:00Z"), ZoneOffset.UTC));
     }
 

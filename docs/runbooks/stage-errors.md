@@ -2,9 +2,9 @@
 
 **SLO:** at least 99% of executions of each stage succeed. Fast burn pages at 14.4x budget consumption (5m and 1h windows).
 
-**Metric:** `hdip_pipeline_messages_total{stage,outcome}`. There is no dead-letter topic yet: a message that keeps failing is
-retried by the Spring Kafka default error handler and then skipped, so a sustained failure ratio means messages are being dropped
-from that stage. Treat this alert as potential data loss.
+**Metric:** `hdip_pipeline_messages_total{stage,outcome}`. A failing record is retried with backoff and then published to
+`<topic>.dlt` (see `dead-letter.md`), so a sustained failure ratio means records are accumulating in dead-letter topics until
+the cause is fixed. They are not dropped, but they are not processed either: treat this alert as delayed data.
 
 ## Triage
 1. Which stage? `persist*` failures usually mean Postgres is unreachable or rejecting writes; `normalize` failures mean unparseable input

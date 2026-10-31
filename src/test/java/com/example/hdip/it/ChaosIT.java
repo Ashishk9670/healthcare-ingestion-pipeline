@@ -157,6 +157,7 @@ class ChaosIT {
         Map<String, Synth> accepted = new ConcurrentHashMap<>(); // messageId -> identifiers
         List<Synth> attempted = Collections.synchronizedList(new ArrayList<>());
         AtomicBoolean stop = new AtomicBoolean();
+        java.util.concurrent.atomic.AtomicInteger rejected = new java.util.concurrent.atomic.AtomicInteger();
 
         Thread producer = new Thread(() -> {
             int i = 0;
@@ -167,6 +168,7 @@ class ChaosIT {
                     accepted.put(ingestion.submit("HL7V2", hl7(s, i)), s);
                 } catch (Exception e) {
                     // Rejected during an outage: the caller saw an error and may retry; not counted as accepted.
+                    if (e instanceof com.example.hdip.kafka.PublishFailedException) rejected.incrementAndGet();
                 }
                 i++;
                 sleep(150);
@@ -175,8 +177,8 @@ class ChaosIT {
         producer.start();
 
         sleep(4000);
-        kafkaProxy.disable(); // cut Kafka mid-run
-        sleep(6000);
+        kafkaProxy.disable(); // cut Kafka mid-run, longer than the producer's delivery.timeout.ms (15s)
+        sleep(22_000);
         kafkaProxy.enable();
         sleep(6000);
         pgProxy.disable();    // then cut Postgres mid-run
@@ -186,6 +188,9 @@ class ChaosIT {
         stop.set(true);
         producer.join(60_000);
         assertThat(accepted).as("messages accepted during the run").hasSizeGreaterThan(10);
+        // Before the fix these sends were fire-and-forget: the API answered 202 and the message was dropped once the
+        // producer gave up. Now they are rejected, so "accepted" always means "durably in Kafka".
+        assertThat(rejected.get()).as("publishes rejected while Kafka was down for longer than the delivery timeout").isPositive();
 
         Map<String, Synth> byHash = new ConcurrentHashMap<>();
         for (Synth s : attempted) byHash.put(cipher.hmac(s.mrn()), s);

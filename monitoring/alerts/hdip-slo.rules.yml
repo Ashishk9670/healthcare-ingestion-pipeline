@@ -47,6 +47,23 @@ groups:
           summary: "Stage {{ $labels.stage }} is burning its error budget at more than 14x"
           runbook_url: https://github.com/Ashishk9670/healthcare-ingestion-pipeline/blob/main/docs/runbooks/stage-errors.md
 
+      # Any dead-lettered record is data that needs a human: it will not be reprocessed automatically.
+      - alert: HdipMessagesDeadLettered
+        expr: sum by (topic) (increase(hdip_pipeline_dead_lettered_total[10m])) > 0
+        labels: { severity: critical, slo: stage-errors }
+        annotations:
+          summary: "Records from {{ $labels.topic }} were dead-lettered in the last 10 minutes"
+          runbook_url: https://github.com/Ashishk9670/healthcare-ingestion-pipeline/blob/main/docs/runbooks/dead-letter.md
+
+      # The API only answers 202 once Kafka acknowledged the message, so these are clients being told to retry.
+      - alert: HdipIngestPublishFailing
+        expr: sum(increase(hdip_ingest_rejected_total{reason="publish_failed"}[5m])) > 0
+        for: 5m
+        labels: { severity: critical, slo: availability }
+        annotations:
+          summary: "Ingest is rejecting messages because Kafka is not acknowledging publishes"
+          runbook_url: https://github.com/Ashishk9670/healthcare-ingestion-pipeline/blob/main/docs/runbooks/dead-letter.md
+
       - alert: HdipConsumerLagHigh
         expr: max by (client_id) (kafka_consumer_fetch_manager_records_lag_max) > 1000
         for: 10m

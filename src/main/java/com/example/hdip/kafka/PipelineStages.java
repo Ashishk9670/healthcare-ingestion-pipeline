@@ -12,7 +12,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 /**
@@ -24,13 +23,13 @@ public class PipelineStages {
     private static final Logger log = LoggerFactory.getLogger(PipelineStages.class);
 
     private final ObjectMapper mapper;
-    private final KafkaTemplate<String, String> kafka;
+    private final KafkaPublisher kafka;
     private final NormalizationService normalizer;
     private final EnrichmentService enricher;
     private final PatientStoreService store;
     private final PipelineMetrics metrics;
 
-    public PipelineStages(ObjectMapper mapper, KafkaTemplate<String, String> kafka, NormalizationService normalizer,
+    public PipelineStages(ObjectMapper mapper, KafkaPublisher kafka, NormalizationService normalizer,
                           EnrichmentService enricher, PatientStoreService store, PipelineMetrics metrics) {
         this.mapper = mapper;
         this.kafka = kafka;
@@ -45,7 +44,7 @@ public class PipelineStages {
         metrics.timeStage(Stage.NORMALIZE, () -> {
             RawMessage raw = mapper.readValue(json, RawMessage.class);
             CanonicalRecord canonical = normalizer.normalize(raw);
-            kafka.send(Topics.NORMALIZED, raw.messageId(), mapper.writeValueAsString(canonical));
+            kafka.publish(Topics.NORMALIZED, raw.messageId(), mapper.writeValueAsString(canonical));
             log.info("Normalized message {} ({})", raw.messageId(), raw.format());
             return null;
         });
@@ -56,7 +55,7 @@ public class PipelineStages {
         metrics.timeStage(Stage.ENRICH, () -> {
             CanonicalRecord canonical = mapper.readValue(json, CanonicalRecord.class);
             EnrichedRecord enriched = enricher.enrich(canonical);
-            kafka.send(Topics.ENRICHED, canonical.messageId(), mapper.writeValueAsString(enriched));
+            kafka.publish(Topics.ENRICHED, canonical.messageId(), mapper.writeValueAsString(enriched));
             log.info("Enriched message {}", canonical.messageId());
             return null;
         });

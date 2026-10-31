@@ -23,6 +23,13 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
       acks: all
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        # bounded so an outage fails the publish (API -> 503, consumer -> retry then dead-letter) instead of hanging
+        max.block.ms: 5000
+        delivery.timeout.ms: 15000
+        request.timeout.ms: 5000
   graphql:
     graphiql:
       enabled: false

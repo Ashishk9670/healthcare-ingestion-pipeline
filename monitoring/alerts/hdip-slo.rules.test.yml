@@ -91,3 +91,31 @@ tests:
             exp_annotations:
               summary: "No HDIP application instance is being scraped successfully"
               runbook_url: https://github.com/Ashishk9670/healthcare-ingestion-pipeline/blob/main/docs/runbooks/app-down.md
+
+  - name: dead-lettered records and failing publishes alert
+    interval: 1m
+    input_series:
+      - series: 'hdip_pipeline_dead_lettered_total{topic="phi.raw"}'
+        values: '0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1'
+      - series: 'hdip_ingest_rejected_total{reason="publish_failed"}'
+        values: '0+5x20'
+      - series: 'hdip_ingest_rejected_total{reason="invalid"}'
+        values: '0+5x20'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: HdipMessagesDeadLettered
+        exp_alerts:
+          - exp_labels: { severity: critical, slo: stage-errors, topic: phi.raw }
+            exp_annotations:
+              summary: "Records from phi.raw were dead-lettered in the last 10 minutes"
+              runbook_url: https://github.com/Ashishk9670/healthcare-ingestion-pipeline/blob/main/docs/runbooks/dead-letter.md
+      - eval_time: 18m
+        alertname: HdipMessagesDeadLettered
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: HdipIngestPublishFailing
+        exp_alerts:
+          - exp_labels: { severity: critical, slo: availability }
+            exp_annotations:
+              summary: "Ingest is rejecting messages because Kafka is not acknowledging publishes"
+              runbook_url: https://github.com/Ashishk9670/healthcare-ingestion-pipeline/blob/main/docs/runbooks/dead-letter.md

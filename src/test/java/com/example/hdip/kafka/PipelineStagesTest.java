@@ -36,7 +36,7 @@ class PipelineStagesTest {
     PipelineStages stages() {
         var norm = new NormalizationService(new Hl7V2Parser(), new FhirJsonNormalizer(mapper));
         var enrich = new EnrichmentService(new CodingLookup(), Clock.fixed(Instant.parse("2026-06-15T00:00:00Z"), java.time.ZoneOffset.UTC));
-        return new PipelineStages(mapper, kafka, norm, enrich, store, new com.example.hdip.observability.PipelineMetrics(registry));
+        return new PipelineStages(mapper, AckedKafka.publisher(kafka), norm, enrich, store, new com.example.hdip.observability.PipelineMetrics(registry));
     }
 
     @Test
@@ -75,5 +75,18 @@ class PipelineStagesTest {
         assertThat(registry.get(PipelineMetrics.STAGE_COUNT).tag("stage", "normalize").tag("outcome", "failure").counter().count()).isEqualTo(1.0);
         // no meter tag value contains payload content
         registry.getMeters().forEach(m -> m.getId().getTags().forEach(t -> assertThat(t.getValue()).doesNotContain("not json")));
+    }
+
+    @Test
+    void failedPublishPropagatesSoTheInputOffsetIsNotCommitted() throws Exception {
+        org.mockito.Mockito.lenient().when(kafka.send(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString())).thenReturn(java.util.concurrent.CompletableFuture.failedFuture(new RuntimeException("down")));
+        var norm = new NormalizationService(new Hl7V2Parser(), new FhirJsonNormalizer(mapper));
+        var enrich = new EnrichmentService(new CodingLookup(), Clock.fixed(Instant.parse("2026-06-15T00:00:00Z"), java.time.ZoneOffset.UTC));
+        var failing = new PipelineStages(mapper, new KafkaPublisher(kafka, java.time.Duration.ofSeconds(1)), norm, enrich, store,
+                new com.example.hdip.observability.PipelineMetrics(registry));
+        String hl7 = "MSH|^~\\&|A|B|C|D|2026||ORU^R01|1|P|2.5\rPID|1||SYN-9^^^S^MR||Faux^Casey||19800101|F";
+        String rawJson = mapper.writeValueAsString(new RawMessage("m1", RawMessage.HL7V2, hl7, Instant.now(), "t"));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> failing.onRaw(rawJson)).isInstanceOf(PublishFailedException.class);
     }
 }
