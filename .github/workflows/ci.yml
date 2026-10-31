@@ -123,7 +123,7 @@ jobs:
           docker run --rm -v "$PWD/docker/observability/loki/loki-config.yaml:/c.yaml:ro" grafana/loki:3.2.1 -config.file=/c.yaml -verify-config
           docker run --rm -v "$PWD/docker/observability/tempo/tempo.yaml:/c.yaml:ro" grafana/tempo:2.6.1 -config.file=/c.yaml -config.verify=true
           docker run --rm -v "$PWD/docker/observability/alloy/config.alloy:/c.alloy:ro" grafana/alloy:v1.5.1 fmt /c.alloy > /dev/null
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       - name: Build image (not pushed)
         uses: docker/build-push-action@v7
         with:
