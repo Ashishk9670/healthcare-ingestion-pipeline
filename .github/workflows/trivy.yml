@@ -33,7 +33,8 @@ jobs:
           context: .
           load: true
           tags: hdip/healthcare-ingestion-pipeline:scan
-          cache-from: type=gha
+          # Always build fresh: a cached `apk upgrade` layer would keep scanning stale OS packages after upstream fixes.
+          no-cache: true
       - name: Image scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
