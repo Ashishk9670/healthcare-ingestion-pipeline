@@ -7,4 +7,5 @@ public final class Topics {
     public static final String RAW = "phi.raw";
     public static final String NORMALIZED = "phi.normalized";
     public static final String ENRICHED = "phi.enriched";
+    public static final String EXTRACTED = "phi.extracted";
 }

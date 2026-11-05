@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hdip.example/schemas/phi.extracted.schema.json",
+  "title": "ExtractionEvent (topic phi.extracted)",
+  "description": "Structured facts extracted from clinical notes. Carries only an HMAC of the MRN: never the MRN, names or note text.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["messageId", "mrnHash", "facts", "extractedAt"],
+  "properties": {
+    "messageId": { "type": "string", "minLength": 1 },
+    "mrnHash": { "type": "string", "minLength": 1 },
+    "facts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "value"],
+        "properties": {
+          "kind": { "enum": ["DIAGNOSIS", "MEDICATION", "STAGE"] },
+          "value": { "type": "string", "minLength": 1 },
+          "code": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "extractedAt": { "type": "string", "format": "date-time" }
+  }
+}

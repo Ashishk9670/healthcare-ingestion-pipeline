@@ -29,6 +29,15 @@ public class SyntheticDataGenerator {
             {"N18.3", "Chronic kidney disease, stage 3"}};
     private static final String[][] OBS = {{"4548-4", "Hemoglobin A1c", "%", "4.5", "9.5"},
             {"8480-6", "Systolic blood pressure", "mm[Hg]", "95", "180"}, {"2339-0", "Glucose", "mg/dL", "70", "260"}};
+    private static final String[] STAGES = {"IA", "IIB", "IIIA", "IV"};
+    private static final String[][] NOTE_FINDINGS = {
+            {"type 2 diabetes mellitus", "metformin 500 mg twice daily"},
+            {"essential hypertension", "lisinopril 10 mg daily"},
+            {"asthma", "albuterol inhaler as needed"},
+            {"chronic kidney disease stage 3", "atorvastatin 20 mg nightly"},
+            {"breast cancer", "tamoxifen 20 mg daily"}};
+    /** FHIR dateTime requires seconds when a time is present (OffsetDateTime.toString() drops zero seconds). */
+    private static final DateTimeFormatter FHIR_DATETIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX");
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private final Random random;
@@ -68,6 +77,15 @@ public class SyntheticDataGenerator {
                 random.nextBoolean() ? "female" : "male", ssn, dx, obs);
     }
 
+    /** SYNTHETIC free-text clinical note (no HL7 delimiter characters). */
+    public String clinicalNote(SyntheticPatient p) {
+        String[] f = NOTE_FINDINGS[random.nextInt(NOTE_FINDINGS.length)];
+        StringBuilder sb = new StringBuilder("Synthetic follow-up visit. Assessment: ").append(f[0]);
+        if (f[0].equals("breast cancer")) sb.append(", stage ").append(STAGES[random.nextInt(STAGES.length)]);
+        sb.append(". Current therapy: ").append(f[1]).append(". No evidence of heart failure. Plan: continue regimen and recheck in 3 months.");
+        return sb.toString();
+    }
+
     public String hl7Message() {
         return hl7Message(patient());
     }
@@ -90,6 +108,7 @@ public class SyntheticDataGenerator {
         for (String[] d : p.diagnoses()) {
             segs.add("DG1|" + i++ + "||" + d[0] + "^" + d[1] + "^I10");
         }
+        segs.add("NTE|1||" + clinicalNote(p));
         i = 1;
         for (String[] o : p.observations()) {
             String[] obx = new String[15];
@@ -115,7 +134,10 @@ public class SyntheticDataGenerator {
         bundle.put("resourceType", "Bundle").put("type", "collection").put("id", UUID.randomUUID().toString());
         ArrayNode entries = bundle.putArray("entry");
 
-        ObjectNode pat = entries.addObject().putObject("resource");
+        String patUrl = "urn:uuid:" + UUID.randomUUID();
+        ObjectNode patEntry = entries.addObject();
+        patEntry.put("fullUrl", patUrl);
+        ObjectNode pat = patEntry.putObject("resource");
         pat.put("resourceType", "Patient");
         ArrayNode ids = pat.putArray("identifier");
         ids.addObject().put("system", "urn:synthetic:mrn").put("value", p.mrn());
@@ -127,18 +149,33 @@ public class SyntheticDataGenerator {
         pat.put("birthDate", p.dob().toString());
 
         for (String[] d : p.diagnoses()) {
-            ObjectNode c = entries.addObject().putObject("resource");
+            ObjectNode ce = entries.addObject();
+            ce.put("fullUrl", "urn:uuid:" + UUID.randomUUID());
+            ObjectNode c = ce.putObject("resource");
             c.put("resourceType", "Condition");
+            c.putObject("subject").put("reference", patUrl);
             c.putObject("code").putArray("coding").addObject()
                     .put("system", "http://hl7.org/fhir/sid/icd-10-cm").put("code", d[0]).put("display", d[1]);
         }
+        ObjectNode de = entries.addObject();
+        de.put("fullUrl", "urn:uuid:" + UUID.randomUUID());
+        ObjectNode doc = de.putObject("resource");
+        doc.put("resourceType", "DocumentReference");
+        doc.put("status", "current");
+        doc.putObject("subject").put("reference", patUrl);
+        doc.putArray("content").addObject().putObject("attachment").put("contentType", "text/plain")
+                .put("data", java.util.Base64.getEncoder().encodeToString(clinicalNote(p).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
         for (String[] o : p.observations()) {
-            ObjectNode ob = entries.addObject().putObject("resource");
+            ObjectNode oe = entries.addObject();
+            oe.put("fullUrl", "urn:uuid:" + UUID.randomUUID());
+            ObjectNode ob = oe.putObject("resource");
             ob.put("resourceType", "Observation");
+            ob.put("status", "final");
+            ob.putObject("subject").put("reference", patUrl);
             ob.putObject("code").putArray("coding").addObject()
                     .put("system", "http://loinc.org").put("code", o[0]).put("display", o[1]);
             ob.putObject("valueQuantity").put("value", Double.parseDouble(o[3])).put("unit", o[2]);
-            ob.put("effectiveDateTime", java.time.OffsetDateTime.now(ZoneOffset.UTC).withNano(0).toString());
+            ob.put("effectiveDateTime", java.time.OffsetDateTime.now(ZoneOffset.UTC).format(FHIR_DATETIME));
         }
         return bundle.toString();
     }

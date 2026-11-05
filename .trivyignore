@@ -1,0 +1,10 @@
+# Spring Framework 6.2.x is at its latest release (6.2.19); these are fixed only in 7.x (Spring Boot 4).
+# Tracked via Dependabot (Boot 4 bump PR). Revisit on every Boot upgrade.
+CVE-2026-47884
+CVE-2026-47890
+
+# guava 32.1.2 is shaded inside graphql-java (package graphql.com.google.common), so it cannot be upgraded on its own.
+# No graphql-java release fixes it (24.3, 25.1, 26.0 and 26.1 all ship 32.1.2). The CVE is a denial of service through Java
+# deserialization of attacker-controlled Guava collections; this service never deserializes untrusted Java objects.
+# Revisit when graphql-java ships a newer guava.
+CVE-2026-102554

@@ -6,7 +6,7 @@
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.5.6</version>
+    <version>3.5.16</version>
     <relativePath/>
   </parent>
 
@@ -19,11 +19,31 @@
   <properties>
     <java.version>21</java.version>
     <jacoco.version>0.8.15</jacoco.version>
+    <postgresql.version>42.7.14</postgresql.version>
+    <!-- CVE overrides ahead of the Boot BOM (see Trivy workflow); drop when Boot catches up -->
+    <jackson-bom.version>2.21.7</jackson-bom.version>
+    <tomcat.version>10.1.60</tomcat.version>
+    <httpcore5.version>5.4.3</httpcore5.version>
+    <httpclient5.version>5.6.4</httpclient5.version>
     <jacoco.minimum>0.70</jacoco.minimum>
-    <testcontainers.version>1.21.3</testcontainers.version>
+    <pit.mutation.threshold>70</pit.mutation.threshold>
+    <hapi.version>8.12.1</hapi.version>
+    <jqwik.version>1.9.3</jqwik.version>
+    <archunit.version>1.4.1</archunit.version>
+    <testcontainers.version>1.21.4</testcontainers.version>
     <!-- Lets Mockito/ByteBuddy run on newer JDKs than the one it was built against -->
     <test.argLine>-Dnet.bytebuddy.experimental=true -XX:+EnableDynamicAgentLoading</test.argLine>
   </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency><groupId>at.yawk.lz4</groupId><artifactId>lz4-java</artifactId><version>1.11.4</version></dependency>
+      <!-- transitive via spring-kafka/kafka-clients: 1.1.10.5 has two HIGH CVEs (buffer overflow, DoS) -->
+      <dependency><groupId>org.xerial.snappy</groupId><artifactId>snappy-java</artifactId><version>1.1.10.9</version></dependency>
+      <!-- transitive via HAPI FHIR: 33.2.1 has a HIGH CVE (fixed in 33.7.2) -->
+      <dependency><groupId>com.google.guava</groupId><artifactId>guava</artifactId><version>33.7.2-jre</version></dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
@@ -39,6 +59,10 @@
     <dependency><groupId>org.springframework.kafka</groupId><artifactId>spring-kafka</artifactId></dependency>
     <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-core</artifactId></dependency>
     <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-database-postgresql</artifactId></dependency>
+    <dependency><groupId>ca.uhn.hapi.fhir</groupId><artifactId>hapi-fhir-structures-r4</artifactId><version>${hapi.version}</version></dependency>
+    <dependency><groupId>ca.uhn.hapi.fhir</groupId><artifactId>hapi-fhir-caching-caffeine</artifactId><version>${hapi.version}</version></dependency>
+    <dependency><groupId>ca.uhn.hapi.fhir</groupId><artifactId>hapi-fhir-validation</artifactId><version>${hapi.version}</version></dependency>
+    <dependency><groupId>ca.uhn.hapi.fhir</groupId><artifactId>hapi-fhir-validation-resources-r4</artifactId><version>${hapi.version}</version></dependency>
     <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId><scope>runtime</scope></dependency>
 
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
@@ -47,9 +71,13 @@
     <dependency><groupId>org.springframework.kafka</groupId><artifactId>spring-kafka-test</artifactId><scope>test</scope></dependency>
     <dependency><groupId>org.testcontainers</groupId><artifactId>junit-jupiter</artifactId><version>${testcontainers.version}</version><scope>test</scope></dependency>
     <dependency><groupId>org.testcontainers</groupId><artifactId>postgresql</artifactId><version>${testcontainers.version}</version><scope>test</scope></dependency>
+    <dependency><groupId>org.testcontainers</groupId><artifactId>toxiproxy</artifactId><version>${testcontainers.version}</version><scope>test</scope></dependency>
     <dependency><groupId>org.testcontainers</groupId><artifactId>kafka</artifactId><version>${testcontainers.version}</version><scope>test</scope></dependency>
     <dependency><groupId>com.github.dasniko</groupId><artifactId>testcontainers-keycloak</artifactId><version>3.8.0</version><scope>test</scope></dependency>
     <dependency><groupId>org.awaitility</groupId><artifactId>awaitility</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>com.networknt</groupId><artifactId>json-schema-validator</artifactId><version>1.5.6</version><scope>test</scope></dependency>
+    <dependency><groupId>net.jqwik</groupId><artifactId>jqwik</artifactId><version>${jqwik.version}</version><scope>test</scope></dependency>
+    <dependency><groupId>com.tngtech.archunit</groupId><artifactId>archunit-junit5</artifactId><version>${archunit.version}</version><scope>test</scope></dependency>
   </dependencies>
 
   <build>
@@ -135,4 +163,51 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <!-- Mutation testing (optional, slow): mvn -B -Pmutation test-compile org.pitest:pitest-maven:mutationCoverage -->
+    <profile>
+      <id>mutation</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.pitest</groupId>
+            <artifactId>pitest-maven</artifactId>
+            <version>1.30.1</version>
+            <dependencies>
+              <dependency>
+                <groupId>org.pitest</groupId>
+                <artifactId>pitest-junit5-plugin</artifactId>
+                <version>1.2.3</version>
+              </dependency>
+            </dependencies>
+            <configuration>
+              <targetClasses>
+                <param>com.example.hdip.parse.*</param>
+                <param>com.example.hdip.logging.*</param>
+                <param>com.example.hdip.deid.*</param>
+                <param>com.example.hdip.consent.*</param>
+                <param>com.example.hdip.crypto.*</param>
+              </targetClasses>
+              <targetTests>
+                <param>com.example.hdip.parse.*</param>
+                <param>com.example.hdip.logging.*</param>
+                <param>com.example.hdip.deid.*</param>
+                <param>com.example.hdip.consent.*</param>
+                <param>com.example.hdip.crypto.*</param>
+              </targetTests>
+              <excludedTestClasses><param>*IT</param></excludedTestClasses>
+              <threads>2</threads>
+              <timeoutConstant>8000</timeoutConstant>
+              <outputFormats><param>HTML</param><param>XML</param></outputFormats>
+              <timestampedReports>false</timestampedReports>
+              <jvmArgs><jvmArg>-Dnet.bytebuddy.experimental=true</jvmArg><jvmArg>-XX:+EnableDynamicAgentLoading</jvmArg></jvmArgs>
+              <!-- Set from the first measured score (see docs/mutation-testing.md) -->
+              <mutationThreshold>${pit.mutation.threshold}</mutationThreshold>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

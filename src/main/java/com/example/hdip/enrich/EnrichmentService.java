@@ -23,7 +23,7 @@ public class EnrichmentService {
                 o.valueText(), o.valueNumeric(), o.unit(), o.effectiveAt())).toList();
         var dx = rec.diagnoses().stream().map(d -> d.display() != null ? d
                 : new CanonicalDiagnosis(d.code(), d.system(), lookup.display(d.code()).orElse(null))).toList();
-        var canonical = new CanonicalRecord(rec.messageId(), rec.source(), rec.patient(), obs, dx);
+        var canonical = new CanonicalRecord(rec.messageId(), rec.source(), rec.patient(), obs, dx, rec.notes());
         String band = AgeBand.of(rec.patient().birthDate(), LocalDate.now(clock));
         return new EnrichedRecord(canonical, band, Instant.now(clock));
     }

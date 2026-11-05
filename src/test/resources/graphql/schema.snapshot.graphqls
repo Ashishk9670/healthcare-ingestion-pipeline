@@ -1,0 +1,79 @@
+type AuditEntry {
+  action: String!
+  actor: String!
+  detail: String
+  id: String!
+  resourceId: String
+  resourceType: String
+  roles: String
+  timestamp: String!
+}
+
+type Bucket {
+  count: Int!
+  key: String!
+}
+
+type CohortMember {
+  ageBand: String!
+  diagnosisCodes: [String!]!
+  gender: String!
+  patientRef: String!
+}
+
+type CohortSummary {
+  byAgeBand: [Bucket!]!
+  byDiagnosis: [Bucket!]!
+  byGender: [Bucket!]!
+  members: [CohortMember!]!
+  totalPatients: Int!
+}
+
+type Diagnosis {
+  code: String
+  display: String
+  system: String
+}
+
+type Observation {
+  code: String
+  display: String
+  effectiveAt: String
+  unit: String
+  valueNumeric: Float
+  valueText: String
+}
+
+type Patient {
+  ageBand: String
+  birthDate: String
+  diagnoses: [Diagnosis!]!
+  familyName: String
+  gender: String
+  givenName: String
+  mrn: String
+  observations: [Observation!]!
+}
+
+type Query {
+  "Most recent audit entries (AUDITOR only)"
+  auditLog(limit: Int): [AuditEntry!]!
+  "De-identified cohort aggregates (CLINICIAN, ANALYST)"
+  cohort(filter: CohortFilter, limit: Int): CohortSummary!
+  "Patient detail by MRN (CLINICIAN only)"
+  patient(mrn: String!): Patient
+}
+
+input CohortFilter {
+  "One of 0-17, 18-34, 35-49, 50-64, 65-79, 80+"
+  ageBand: String
+  "ICD-10 code or prefix, e.g. E11 or E11.9"
+  diagnosisCode: String
+  "ICD-10 code or prefix extracted from clinical notes (NLP enrichment), e.g. C50"
+  extractedDiagnosis: String
+  gender: String
+  "Medication name extracted from clinical notes, e.g. metformin"
+  medication: String
+  "Cancer/disease stage extracted from clinical notes, e.g. IIB"
+  stage: String
+}

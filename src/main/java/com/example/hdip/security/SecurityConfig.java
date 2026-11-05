@@ -1,7 +1,6 @@
 package com.example.hdip.security;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -34,13 +33,17 @@ public class SecurityConfig {
                         // With a separate management port, actuator endpoints (Prometheus, probes) are not served on the public
                         // port at all and are open on the management port, which must not be exposed publicly.
                         if (managementPort > 0 && managementPort != serverPort) {
-                            a.requestMatchers(EndpointRequest.toAnyEndpoint()).permitAll();
+                            // match on the connector's local port (robust for the management child context)
+                            a.requestMatchers(req -> req.getLocalPort() == managementPort
+                                    && req.getRequestURI().startsWith("/actuator/")).permitAll();
                         }
                         a
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers("/", "/index.html", "/app.js", "/config.js", "/style.css", "/favicon.ico").permitAll() // static dashboard shell
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/v1/ingest/**", "/api/v1/synthetic/**").hasRole("INGESTOR")
+                        .requestMatchers("/api/v1/export/**").hasRole("ANALYST")
+                        .requestMatchers("/api/v1/consent/**").hasRole("CLINICIAN")
                         .requestMatchers("/graphql").authenticated() // field-level rules via @PreAuthorize
                         .anyRequest().denyAll();
                 })

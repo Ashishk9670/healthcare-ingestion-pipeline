@@ -1,0 +1,3 @@
+HDIP deployed (SYNTHETIC DATA ONLY).
+The pod needs the Secret "{{ .Values.existingSecret }}" with DB_PASSWORD, PHI_ENCRYPTION_KEYS, PHI_ACTIVE_KEY_ID and PHI_HMAC_KEY.
+Create it from your secret manager (see deploy/helm/examples) and never commit real values.

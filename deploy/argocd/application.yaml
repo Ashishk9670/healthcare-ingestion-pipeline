@@ -1,0 +1,29 @@
+# EXAMPLE Argo CD Application: deploys the Helm chart from this repository. Adjust destination and values for your cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hdip
+  namespace: argocd
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Ashishk9670/healthcare-ingestion-pipeline.git
+    targetRevision: main
+    path: deploy/helm/hdip
+    helm:
+      releaseName: hdip
+      valuesObject:
+        externalSecret:
+          enabled: true
+        config:
+          KEYCLOAK_ISSUER: https://keycloak.example.test/realms/healthcare
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: hdip
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

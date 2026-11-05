@@ -1,0 +1,3 @@
+# Used by CI (helm lint / template | kubeconform) to exercise the optional templates.
+externalSecret:
+  enabled: true

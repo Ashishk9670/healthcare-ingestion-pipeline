@@ -17,7 +17,7 @@ public class PipelineMetrics {
     public static final String INGEST_COUNT = "hdip.ingest.messages";
     public static final String INGEST_REJECTED = "hdip.ingest.rejected";
 
-    public enum Stage { NORMALIZE, ENRICH, PERSIST }
+    public enum Stage { NORMALIZE, ENRICH, EXTRACT, PERSIST_EXTRACTION, PERSIST }
 
     private final MeterRegistry registry;
 

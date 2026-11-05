@@ -73,4 +73,11 @@ class Hl7V2ParserTest {
         assertThatThrownBy(() -> parser.parse("x", "MSH|^~\\&|A\rPID|1||M1||Doe^J||99999999|M"))
                 .satisfies(e -> assertThat(e.getMessage()).doesNotContain("Doe"));
     }
+
+    @Test
+    void parsesNteSegmentsAsNotes() {
+        String msg = "MSH|^~\\&|A|B|C|D|2026||ORU^R01|1|P|2.5\rPID|1||SYN-9^^^S^MR||Faux^Casey||19800101|F\rNTE|1||Breast cancer stage IIB on tamoxifen.";
+        var rec = new Hl7V2Parser().parse("m", msg);
+        assertThat(rec.notes()).containsExactly("Breast cancer stage IIB on tamoxifen.");
+    }
 }

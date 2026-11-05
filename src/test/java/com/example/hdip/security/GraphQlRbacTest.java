@@ -56,7 +56,7 @@ class GraphQlRbacTest {
         tester.document(COHORT).execute().path("cohort.totalPatients").entity(Integer.class).isEqualTo(1);
         verify(audit).record(eq("PATIENT_VIEW"), any(), any(), any());
         verify(audit).record(eq("COHORT_QUERY"), any(), any(), any());
-        verify(queries).cohort(eq(new CohortFilter("E11", "50-64", null)), eq(5));
+        verify(queries).cohort(eq(new CohortFilter("E11", "50-64", null, null, null, null)), eq(5));
     }
 
     @Test

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hdip.example/schemas/phi.raw.schema.json",
+  "title": "RawMessage (topic phi.raw)",
+  "description": "Envelope for an inbound HL7 v2 or FHIR JSON message. The payload is PHI-bearing; synthetic data only in this repository.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["messageId", "format", "payload", "receivedAt"],
+  "properties": {
+    "messageId": { "type": "string", "minLength": 1 },
+    "format": { "enum": ["HL7V2", "FHIR_JSON"] },
+    "payload": { "type": "string", "minLength": 1 },
+    "receivedAt": { "type": "string", "format": "date-time" },
+    "submittedBy": { "type": ["string", "null"] }
+  }
+}
