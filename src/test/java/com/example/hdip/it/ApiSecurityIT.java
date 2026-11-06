@@ -111,10 +111,16 @@ class ApiSecurityIT extends AbstractIntegrationTest {
     @Test
     void cohortFiltersApply() {
         seed();
-        String none = "{ cohort(filter:{diagnosisCode:\"C50\", ageBand:\"80+\"}){ totalPatients } }";
-        assertThat(graphql(token("analyst1"), none).json().at("/data/cohort/totalPatients").asInt()).isZero();
-        String female = "{ cohort(filter:{gender:\"female\", diagnosisCode:\"E11\", ageBand:\"50-64\"}){ totalPatients } }";
-        assertThat(graphql(token("analyst1"), female).json().at("/data/cohort/totalPatients").asInt()).isZero();
+        String analyst = token("analyst1");
+        // The Postgres container is shared by every IT and PipelineIT ingests random synthetic patients (ages 5-90, either gender,
+        // E11/C50/...), so "expect zero" assertions must use filters no generated or seeded patient can match.
+        String impossibleGender = "{ cohort(filter:{gender:\"unknown\", diagnosisCode:\"E11\"}){ totalPatients } }";
+        assertThat(graphql(analyst, impossibleGender).json().at("/data/cohort/totalPatients").asInt()).isZero();
+        String impossibleDiagnosis = "{ cohort(filter:{diagnosisCode:\"ZZ99\"}){ totalPatients } }";
+        assertThat(graphql(analyst, impossibleDiagnosis).json().at("/data/cohort/totalPatients").asInt()).isZero();
+        // positive control: the seeded male E11 patient (age band 50-64) is matched, so zero above means the filters narrow
+        String seeded = "{ cohort(filter:{gender:\"male\", diagnosisCode:\"E11\", ageBand:\"50-64\"}){ totalPatients } }";
+        assertThat(graphql(analyst, seeded).json().at("/data/cohort/totalPatients").asInt()).isGreaterThanOrEqualTo(1);
     }
 
     @Test

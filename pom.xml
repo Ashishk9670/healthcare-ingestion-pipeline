@@ -37,7 +37,7 @@
 
   <dependencyManagement>
     <dependencies>
-      <dependency><groupId>at.yawk.lz4</groupId><artifactId>lz4-java</artifactId><version>1.11.4</version></dependency>
+      <dependency><groupId>at.yawk.lz4</groupId><artifactId>lz4-java</artifactId><version>1.12.1</version></dependency>
       <!-- transitive via spring-kafka/kafka-clients: 1.1.10.5 has two HIGH CVEs (buffer overflow, DoS) -->
       <dependency><groupId>org.xerial.snappy</groupId><artifactId>snappy-java</artifactId><version>1.1.10.9</version></dependency>
       <!-- transitive via HAPI FHIR: 33.2.1 has a HIGH CVE (fixed in 33.7.2) -->
@@ -121,7 +121,7 @@
       <plugin>
         <groupId>com.diffplug.spotless</groupId>
         <artifactId>spotless-maven-plugin</artifactId>
-        <version>2.43.0</version>
+        <version>3.10.4</version>
         <configuration>
           <java>
             <trimTrailingWhitespace/>
