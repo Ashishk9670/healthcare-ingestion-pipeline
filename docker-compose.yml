@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run scripts/gen-dev-env.sh}
     ports: ["5432:5432"]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hdip -d hdip"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U hdip -d hdip"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -55,6 +55,7 @@ services:
   # ---- optional: the application itself (docker compose --profile app up -d --build) ----
   app:
     profiles: ["app"]
+    restart: on-failure   # safety net: never leave the stack dead if a dependency is briefly unavailable
     build: .
     image: hdip/healthcare-ingestion-pipeline:local
     depends_on:
