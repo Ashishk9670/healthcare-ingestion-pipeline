@@ -3,61 +3,100 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>Cohort Dashboard (synthetic data)</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230e7490'/%3E%3Cpath d='M13 7h6v6h6v6h-6v6h-6v-6H7v-6h6z' fill='white'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<header>
-  <h1>Cohort Dashboard</h1>
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0e7490"/><path d="M13 7h6v6h6v6h-6v6h-6v-6H7v-6h6z" fill="#fff"/></svg>
+    <span>Cohort Dashboard <small>HDIP</small></span>
+  </div>
   <span class="banner">SYNTHETIC DATA ONLY</span>
   <div class="auth">
     <span id="user" data-testid="user"></span>
-    <button id="login" data-testid="login">Sign in</button>
-    <button id="logout" data-testid="logout" hidden>Sign out</button>
+    <button id="login" class="ghost" data-testid="login">Sign in</button>
+    <button id="logout" class="ghost" data-testid="logout" hidden>Sign out</button>
   </div>
 </header>
 
-<main id="app" hidden>
-  <section id="ingest-panel" data-role="INGESTOR" hidden>
-    <h2>Ingestion</h2>
-    <label>Synthetic patients <input id="syn-count" type="number" min="1" max="500" value="10"></label>
-    <button id="syn-go" data-testid="syn-go">Generate &amp; ingest</button>
-    <span id="syn-status" data-testid="syn-status"></span>
+<main>
+  <!-- anonymous landing -->
+  <section id="hero" class="card hero">
+    <svg class="shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7.5 3v5.5c0 4.6-3.1 8.4-7.5 9.5-4.4-1.1-7.5-4.9-7.5-9.5V6L12 3z"/><path d="M9 12l2.2 2.2L15.5 10"/></svg>
+    <h2>Secure cohort analytics</h2>
+    <p>Sign in with your organization account to explore de-identified cohorts. Access depends on your role and every query is audited.</p>
+    <button id="hero-login" class="large">Sign in with single sign-on</button>
+    <ul class="features">
+      <li><strong>Role-based</strong>Clinician, analyst, auditor and ingestor views</li>
+      <li><strong>Encrypted</strong>Sensitive fields encrypted at rest</li>
+      <li><strong>Audited</strong>Every access leaves an audit entry</li>
+    </ul>
   </section>
 
-  <section id="cohort-panel" data-role="CLINICIAN,ANALYST" hidden>
-    <h2>Cohort</h2>
-    <form id="cohort-form">
-      <label>Diagnosis (ICD-10 prefix) <input id="f-dx" placeholder="E11"></label>
-      <label>Age band
-        <select id="f-age"><option value="">any</option><option>0-17</option><option>18-34</option><option>35-49</option>
-          <option>50-64</option><option>65-79</option><option>80+</option></select></label>
-      <label>Gender
-        <select id="f-gender"><option value="">any</option><option>female</option><option>male</option></select></label>
-      <button type="submit" data-testid="cohort-run">Run</button>
-    </form>
-    <p>Total patients: <strong id="total" data-testid="total">-</strong></p>
-    <div class="grid">
-      <div><h3>By age band</h3><table id="t-age" data-testid="t-age"></table></div>
-      <div><h3>By gender</h3><table id="t-gender"></table></div>
-      <div><h3>By diagnosis</h3><table id="t-dx" data-testid="t-dx"></table></div>
-    </div>
-  </section>
+  <div id="app" hidden style="display:contents">
+    <section id="ingest-panel" class="card" data-role="INGESTOR" hidden>
+      <div class="card-head">
+        <div><h2>Ingestion</h2><p>Generate synthetic patients and push them through the pipeline.</p></div>
+      </div>
+      <div class="toolbar">
+        <label class="field">Synthetic patients <input id="syn-count" type="number" min="1" max="500" value="10"></label>
+        <button id="syn-go" data-testid="syn-go">Generate &amp; ingest</button>
+        <span id="syn-status" data-testid="syn-status"></span>
+      </div>
+    </section>
 
-  <section id="patient-panel" data-role="CLINICIAN" hidden>
-    <h2>Patient lookup</h2>
-    <form id="patient-form"><label>MRN <input id="p-mrn" placeholder="SYN-123456"></label>
-      <button type="submit" data-testid="patient-run">Find</button></form>
-    <pre id="patient-out" data-testid="patient-out"></pre>
-  </section>
+    <section id="cohort-panel" class="card" data-role="CLINICIAN,ANALYST" hidden>
+      <div class="card-head">
+        <div><h2>Cohort</h2><p>De-identified aggregates. Filter by diagnosis, age band and gender.</p></div>
+      </div>
+      <form id="cohort-form" class="toolbar">
+        <label class="field">Diagnosis (ICD-10 prefix) <input id="f-dx" placeholder="E11"></label>
+        <label class="field">Age band
+          <select id="f-age"><option value="">any</option><option>0-17</option><option>18-34</option><option>35-49</option>
+            <option>50-64</option><option>65-79</option><option>80+</option></select></label>
+        <label class="field">Gender
+          <select id="f-gender"><option value="">any</option><option>female</option><option>male</option></select></label>
+        <button type="submit" data-testid="cohort-run">Run</button>
+      </form>
 
-  <section id="audit-panel" data-role="AUDITOR" hidden>
-    <h2>Audit log</h2>
-    <button id="audit-go" data-testid="audit-go">Refresh</button>
-    <table id="t-audit" data-testid="t-audit"></table>
-  </section>
+      <div class="kpis" style="margin-top:20px">
+        <div class="kpi"><div class="label">Total patients</div><div class="value"><span id="total" data-testid="total">-</span></div></div>
+        <div class="kpi"><div class="label">Largest age band</div><div class="value small" id="kpi-age">-</div></div>
+        <div class="kpi"><div class="label">Most common diagnosis</div><div class="value small" id="kpi-dx">-</div></div>
+      </div>
 
-  <p id="error" role="alert" data-testid="error"></p>
+      <div class="grid3">
+        <div><h3>By age band</h3><table id="t-age" data-testid="t-age"></table></div>
+        <div><h3>By gender</h3><table id="t-gender"></table></div>
+        <div><h3>By diagnosis</h3><table id="t-dx" data-testid="t-dx"></table></div>
+      </div>
+    </section>
+
+    <section id="patient-panel" class="card" data-role="CLINICIAN" hidden>
+      <div class="card-head">
+        <div><h2>Patient lookup</h2><p>Look up one patient by MRN. Each lookup is written to the audit log.</p></div>
+      </div>
+      <form id="patient-form" class="toolbar">
+        <label class="field">MRN <input id="p-mrn" placeholder="SYN-123456"></label>
+        <button type="submit" data-testid="patient-run">Find</button>
+      </form>
+      <div id="patient-card" aria-live="polite"></div>
+      <details class="raw"><summary>Raw response</summary><pre id="patient-out" data-testid="patient-out"></pre></details>
+    </section>
+
+    <section id="audit-panel" class="card" data-role="AUDITOR" hidden>
+      <div class="card-head">
+        <div><h2>Audit log</h2><p>The 25 most recent access and ingest events.</p></div>
+        <button id="audit-go" data-testid="audit-go">Refresh</button>
+      </div>
+      <div class="tablewrap"><table id="t-audit" data-testid="t-audit"></table></div>
+    </section>
+
+    <p id="error" role="alert" data-testid="error"></p>
+  </div>
 </main>
 <script src="/config.js"></script>
 <script src="/app.js"></script>
