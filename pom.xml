@@ -39,7 +39,7 @@
     <dependencies>
       <dependency><groupId>at.yawk.lz4</groupId><artifactId>lz4-java</artifactId><version>1.12.1</version></dependency>
       <!-- transitive via spring-kafka/kafka-clients: 1.1.10.5 has two HIGH CVEs (buffer overflow, DoS) -->
-      <dependency><groupId>org.xerial.snappy</groupId><artifactId>snappy-java</artifactId><version>1.1.10.9</version></dependency>
+      <dependency><groupId>org.xerial.snappy</groupId><artifactId>snappy-java</artifactId><version>1.1.10.12</version></dependency>
       <!-- transitive via HAPI FHIR: 33.2.1 has a HIGH CVE (fixed in 33.7.2) -->
       <dependency><groupId>com.google.guava</groupId><artifactId>guava</artifactId><version>33.7.2-jre</version></dependency>
     </dependencies>
