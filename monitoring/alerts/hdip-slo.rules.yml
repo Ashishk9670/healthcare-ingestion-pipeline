@@ -64,6 +64,16 @@ groups:
           summary: "Ingest is rejecting messages because Kafka is not acknowledging publishes"
           runbook_url: https://github.com/Ashishk9670/healthcare-ingestion-pipeline/blob/main/docs/runbooks/dead-letter.md
 
+      # Ingestion is CPU-bound and shares one JVM with the pipeline consumers. Past the concurrency limit the API answers
+      # 503 + Retry-After at once instead of queueing requests until they time out; sustained shedding means scale out.
+      - alert: HdipIngestShedding
+        expr: sum(increase(hdip_ingest_rejected_total{reason=~"overloaded|validator_busy"}[5m])) > 0
+        for: 2m
+        labels: { severity: warning, slo: availability }
+        annotations:
+          summary: "Ingest is shedding load: requests are being rejected with 503 because too many are in flight"
+          runbook_url: https://github.com/Ashishk9670/healthcare-ingestion-pipeline/blob/main/docs/runbooks/ingest-overload.md
+
       - alert: HdipConsumerLagHigh
         expr: max by (client_id) (kafka_consumer_fetch_manager_records_lag_max) > 1000
         for: 10m

@@ -15,9 +15,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.Clock;
+import java.util.concurrent.Semaphore;
 
 /**
- * Protects the ingestion endpoints: per-principal rate limit (429 + Retry-After) and a hard request-body size
+ * Protects the ingestion endpoints: per-principal rate limit (429 + Retry-After), a concurrency limit that sheds load
+ * with a fast 503 + Retry-After instead of letting requests queue until they time out, and a hard request-body size
  * limit (413). Runs after Spring Security, so only authenticated callers consume rate-limit buckets. Responses never
  * echo request content.
  */
@@ -25,10 +27,12 @@ public class IngestGuardFilter extends OncePerRequestFilter {
     private final IngestProperties props;
     private final TokenBucketLimiter limiter;
     private final PipelineMetrics metrics;
+    private final Semaphore inFlight;
 
     public IngestGuardFilter(IngestProperties props, Clock clock, PipelineMetrics metrics) {
         this.props = props;
         this.metrics = metrics;
+        this.inFlight = new Semaphore(props.maxConcurrent());
         this.limiter = new TokenBucketLimiter(props.rateLimit().requestsPerMinute(), props.rateLimit().burst(), clock);
     }
 
@@ -59,6 +63,14 @@ public class IngestGuardFilter extends OncePerRequestFilter {
             tooLarge(response);
             return;
         }
+        if (!inFlight.tryAcquire()) {
+            metrics.ingestRejected("overloaded");
+            response.setStatus(HttpStatus.SERVICE_UNAVAILABLE.value());
+            response.setHeader("Retry-After", "1");
+            response.setContentType("application/problem+json");
+            response.getWriter().write("{\"title\":\"Service Unavailable\",\"status\":503,\"detail\":\"Too many ingest requests in flight, retry shortly\"}");
+            return;
+        }
         try {
             chain.doFilter(new LimitedRequest(request, max), response);
         } catch (PayloadTooLargeException e) {
@@ -70,6 +82,8 @@ public class IngestGuardFilter extends OncePerRequestFilter {
             } else {
                 throw e;
             }
+        } finally {
+            inFlight.release();
         }
     }
 

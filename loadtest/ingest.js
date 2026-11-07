@@ -26,7 +26,7 @@ export const options = {
     },
   },
   thresholds: {
-    // 429 (rate limit) is an expected, handled response and is not counted as a failure here
+    // 429 (rate limit) and 503 (load shedding, Retry-After) are expected, handled responses and are not counted as failures here
     'http_req_failed{expected_response:true}': ['rate<0.01'],
     http_req_duration: ['p(95)<500'],
     checks: ['rate>0.99'],
@@ -53,11 +53,11 @@ function hl7(i) {
 export default function (data) {
   const headers = { Authorization: `Bearer ${data.token}` };
   if (__ITER % 2 === 0) {
-    const r = http.post(`${APP}/api/v1/ingest/hl7`, hl7(__ITER), { headers: { ...headers, 'Content-Type': 'text/plain' }, responseCallback: http.expectedStatuses(202, 429) });
-    check(r, { 'hl7 accepted or throttled': (x) => x.status === 202 || x.status === 429 });
+    const r = http.post(`${APP}/api/v1/ingest/hl7`, hl7(__ITER), { headers: { ...headers, 'Content-Type': 'text/plain' }, responseCallback: http.expectedStatuses(202, 429, 503) });
+    check(r, { 'hl7 accepted, throttled or shed': (x) => x.status === 202 || x.status === 429 || x.status === 503 });
   } else {
-    const r = http.post(`${APP}/api/v1/synthetic?count=2`, null, { headers, responseCallback: http.expectedStatuses(202, 429) });
-    check(r, { 'synthetic accepted or throttled': (x) => x.status === 202 || x.status === 429 });
+    const r = http.post(`${APP}/api/v1/synthetic?count=2`, null, { headers, responseCallback: http.expectedStatuses(202, 429, 503) });
+    check(r, { 'synthetic accepted, throttled or shed': (x) => x.status === 202 || x.status === 429 || x.status === 503 });
   }
   sleep(0.1);
 }

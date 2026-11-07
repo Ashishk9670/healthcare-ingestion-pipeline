@@ -119,3 +119,23 @@ tests:
             exp_annotations:
               summary: "Ingest is rejecting messages because Kafka is not acknowledging publishes"
               runbook_url: https://github.com/Ashishk9670/healthcare-ingestion-pipeline/blob/main/docs/runbooks/dead-letter.md
+
+  - name: shedding alert fires from the very first rejection (counter pre-registered at zero)
+    interval: 1m
+    input_series:
+      - series: 'hdip_ingest_rejected_total{reason="overloaded"}'
+        values: '0 0 0 0 5 9 14 20 26 30 30 30'
+      - series: 'hdip_ingest_rejected_total{reason="rate_limited"}'
+        values: '0+0x11'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: HdipIngestShedding
+        exp_alerts: []
+      - eval_time: 9m
+        alertname: HdipIngestShedding
+        exp_alerts:
+          - exp_labels: { severity: warning, slo: availability }
+            exp_annotations:
+              summary: "Ingest is shedding load: requests are being rejected with 503 because too many are in flight"
+              runbook_url: https://github.com/Ashishk9670/healthcare-ingestion-pipeline/blob/main/docs/runbooks/ingest-overload.md
+

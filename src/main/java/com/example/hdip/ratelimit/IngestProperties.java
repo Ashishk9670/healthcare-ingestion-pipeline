@@ -4,10 +4,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /** Limits for the ingestion endpoints ({@code app.ingest.*}). */
 @ConfigurationProperties(prefix = "app.ingest")
-public record IngestProperties(long maxPayloadBytes, int maxSyntheticCount, RateLimit rateLimit) {
+public record IngestProperties(long maxPayloadBytes, int maxSyntheticCount, int maxConcurrent, RateLimit rateLimit) {
     public IngestProperties {
         if (maxPayloadBytes <= 0) maxPayloadBytes = 1_048_576;
         if (maxSyntheticCount <= 0) maxSyntheticCount = 500;
+        // Ingestion is CPU-bound (FHIR validation, encryption): more in-flight requests than this only add latency.
+        if (maxConcurrent <= 0) maxConcurrent = Math.max(4, 2 * Runtime.getRuntime().availableProcessors());
         if (rateLimit == null) rateLimit = new RateLimit(true, 600, 100);
     }
 

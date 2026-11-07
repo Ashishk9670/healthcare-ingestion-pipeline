@@ -64,8 +64,27 @@ class IngestionServiceTest {
         assertThatThrownBy(() -> svc.submit("HL7V2", "MSH|^~\\&|x")).isInstanceOf(com.example.hdip.kafka.PublishFailedException.class);
         // not accepted: no audit entry, no accepted counter, rejection counted by reason
         verifyNoInteractions(audit);
-        assertThat(registry.find(com.example.hdip.observability.PipelineMetrics.INGEST_COUNT).counter()).isNull();
+        assertThat(registry.get(com.example.hdip.observability.PipelineMetrics.INGEST_COUNT).tag("format", "hl7v2").counter().count()).isZero();
         assertThat(registry.get(com.example.hdip.observability.PipelineMetrics.INGEST_REJECTED).tag("reason", "publish_failed").counter().count())
                 .isEqualTo(1.0);
+    }
+
+    @Test
+    void validatorBusyIsRetryableNotAnInvalidMessageAndNothingIsPublished() {
+        var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        var busy = new com.example.hdip.fhir.FhirR4Validator() {
+            @Override
+            public org.hl7.fhir.r4.model.OperationOutcome validate(String json) {
+                throw new com.example.hdip.fhir.FhirValidatorBusyException();
+            }
+        };
+        var svc = new IngestionService(AckedKafka.publisher(kafka), mapper, audit,
+                new com.example.hdip.observability.PipelineMetrics(registry), busy);
+        assertThatThrownBy(() -> svc.submit("FHIR_JSON", "{\"resourceType\":\"Patient\"}"))
+                .isInstanceOf(com.example.hdip.fhir.FhirValidatorBusyException.class);
+        verify(kafka, never()).send(anyString(), anyString(), anyString());
+        verifyNoInteractions(audit);
+        assertThat(registry.get(com.example.hdip.observability.PipelineMetrics.INGEST_REJECTED).tag("reason", "validator_busy").counter().count()).isEqualTo(1.0);
+        assertThat(registry.get(com.example.hdip.observability.PipelineMetrics.INGEST_REJECTED).tag("reason", "invalid").counter().count()).isZero();
     }
 }

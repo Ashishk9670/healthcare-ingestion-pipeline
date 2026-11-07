@@ -91,6 +91,7 @@ app:
   ingest:
     max-payload-bytes: ${INGEST_MAX_PAYLOAD_BYTES:1048576}      # 1 MiB per message
     max-synthetic-count: 500
+    max-concurrent: ${INGEST_MAX_CONCURRENT:0}                   # in-flight ingest requests before 503; 0 = max(4, 2 x CPUs)
     rate-limit:
       enabled: true
       requests-per-minute: ${INGEST_RATE_LIMIT_RPM:600}          # sustained rate per authenticated principal

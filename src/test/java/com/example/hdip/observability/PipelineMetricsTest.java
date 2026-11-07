@@ -40,4 +40,16 @@ class PipelineMetricsTest {
         assertEquals(1.0, registry.counter(PipelineMetrics.INGEST_COUNT, "format", "other").count());
         assertEquals(1.0, registry.counter(PipelineMetrics.INGEST_COUNT, "format", "hl7v2").count());
     }
+
+    @Test
+    void fixedLabelCountersExistAtZeroBeforeAnyEvent() {
+        // otherwise the first failure after startup is invisible to increase() and never alerts
+        for (String reason : new String[] {"invalid", "publish_failed", "rate_limited", "payload_too_large"}) {
+            assertEquals(0.0, registry.get(PipelineMetrics.INGEST_REJECTED).tag("reason", reason).counter().count());
+        }
+        for (PipelineMetrics.Stage st : PipelineMetrics.Stage.values()) {
+            assertEquals(0.0, registry.get(PipelineMetrics.STAGE_COUNT).tag("stage", st.name().toLowerCase()).tag("outcome", "failure").counter().count());
+        }
+        assertEquals(0.0, registry.get(PipelineMetrics.INGEST_COUNT).tag("format", "hl7v2").counter().count());
+    }
 }

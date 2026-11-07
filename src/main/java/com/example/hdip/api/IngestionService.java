@@ -3,6 +3,7 @@ package com.example.hdip.api;
 import com.example.hdip.audit.AuditService;
 import com.example.hdip.fhir.FhirR4Validator;
 import com.example.hdip.fhir.FhirValidationException;
+import com.example.hdip.fhir.FhirValidatorBusyException;
 import com.example.hdip.kafka.Topics;
 import com.example.hdip.model.RawMessage;
 import com.example.hdip.observability.PipelineMetrics;
@@ -42,6 +43,9 @@ public class IngestionService {
         } catch (MessageParseException e) {
             metrics.ingestRejected("invalid");
             throw e;
+        } catch (FhirValidatorBusyException e) {
+            metrics.ingestRejected("validator_busy");
+            throw e;
         }
         String id = UUID.randomUUID().toString();
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -70,7 +74,7 @@ public class IngestionService {
                 if (!n.hasNonNull("resourceType")) throw new MessageParseException("Missing resourceType");
                 var outcome = fhirValidator.validate(payload);
                 if (outcome != null) throw new FhirValidationException(fhirValidator.toJson(outcome));
-            } catch (MessageParseException e) {
+            } catch (MessageParseException | FhirValidatorBusyException e) {
                 throw e;
             } catch (Exception e) {
                 throw new MessageParseException("Invalid JSON", e);

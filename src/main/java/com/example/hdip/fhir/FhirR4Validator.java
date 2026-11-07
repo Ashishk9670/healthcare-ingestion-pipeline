@@ -56,9 +56,34 @@ public class FhirR4Validator {
         t.start();
     }
 
-    /** Returns null when the payload is valid; otherwise a sanitized OperationOutcome containing the errors. */
+    /** Attempts before giving up when the validator's own regex time limit fires (see {@link FhirValidatorBusyException}). */
+    static final int MAX_ATTEMPTS = 3;
+    private static final String REGEX_TIMEOUT = "Regex evaluation timed out";
+
+    ValidationResult runOnce(String json) {
+        return validator().validateWithResult(json);
+    }
+
+    /** True when the validator hit its internal time limit, which is a statement about CPU contention, not about the payload. */
+    static boolean hitInternalTimeLimit(ValidationResult result) {
+        for (SingleValidationMessage m : result.getMessages()) {
+            if (m.getMessage() != null && m.getMessage().contains(REGEX_TIMEOUT)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Returns null when the payload is valid; otherwise a sanitized OperationOutcome containing the errors.
+     *
+     * @throws FhirValidatorBusyException if the validator's internal time limit fired on every attempt
+     */
     public OperationOutcome validate(String json) {
-        ValidationResult result = validator().validateWithResult(json);
+        ValidationResult result = runOnce(json);
+        for (int attempt = 1; hitInternalTimeLimit(result); attempt++) {
+            if (attempt >= MAX_ATTEMPTS) throw new FhirValidatorBusyException();
+            Thread.yield();
+            result = runOnce(json);
+        }
         OperationOutcome oo = new OperationOutcome();
         for (SingleValidationMessage m : result.getMessages()) {
             ResultSeverityEnum sev = m.getSeverity();

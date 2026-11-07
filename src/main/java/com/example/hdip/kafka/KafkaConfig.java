@@ -20,6 +20,13 @@ public class KafkaConfig {
     public static final String DLT_SUFFIX = ".dlt";
     public static final String DLT_METRIC = "hdip.pipeline.dead_lettered";
 
+    /** Series must exist at zero from startup, or the first dead letter would be invisible to increase() in Prometheus. */
+    static void registerDeadLetterCounters(MeterRegistry registry) {
+        for (String topic : java.util.List.of(Topics.RAW, Topics.NORMALIZED, Topics.ENRICHED, Topics.EXTRACTED)) {
+            registry.counter(DLT_METRIC, "topic", topic);
+        }
+    }
+
     @Bean
     NewTopic rawTopic() {
         return TopicBuilder.name(Topics.RAW).partitions(3).replicas(1).build();
@@ -72,6 +79,7 @@ public class KafkaConfig {
                                             @Value("${hdip.kafka.retry.initial-interval:500ms}") java.time.Duration initial,
                                             @Value("${hdip.kafka.retry.max-interval:10s}") java.time.Duration max,
                                             @Value("${hdip.kafka.retry.max-elapsed:60s}") java.time.Duration maxElapsed) {
+        registerDeadLetterCounters(registry);
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(template,
                 (rec, ex) -> new TopicPartition(rec.topic() + DLT_SUFFIX, rec.partition()));
         // Exception messages (notably Jackson's) can quote payload text, so only the exception class goes into the headers.

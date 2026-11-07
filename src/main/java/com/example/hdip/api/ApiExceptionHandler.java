@@ -1,6 +1,7 @@
 package com.example.hdip.api;
 
 import com.example.hdip.fhir.FhirValidationException;
+import com.example.hdip.fhir.FhirValidatorBusyException;
 import com.example.hdip.kafka.PublishFailedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -19,6 +20,13 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
                 .contentType(MediaType.parseMediaType("application/fhir+json"))
                 .body(e.operationOutcomeJson());
+    }
+
+    /** The validator ran out of its internal time limit under load: not the client's fault and worth retrying. */
+    @ExceptionHandler(FhirValidatorBusyException.class)
+    ResponseEntity<ProblemDetail> validatorBusy(FhirValidatorBusyException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).header("Retry-After", "1")
+                .body(ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, "Validation is busy, retry shortly"));
     }
 
     /** The broker did not acknowledge: nothing was accepted, so the client must retry. Never echoes payload or key. */

@@ -19,7 +19,7 @@ class IngestGuardFilterTest {
     private final PipelineMetrics metrics = new PipelineMetrics(registry);
 
     private IngestGuardFilter filter(long maxBytes, int rpm, int burst) {
-        var props = new IngestProperties(maxBytes, 500, new IngestProperties.RateLimit(true, rpm, burst));
+        var props = new IngestProperties(maxBytes, 500, 0, new IngestProperties.RateLimit(true, rpm, burst));
         return new IngestGuardFilter(props, Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC), metrics);
     }
 
@@ -76,5 +76,56 @@ class IngestGuardFilterTest {
         assertEquals(0, l.tryAcquire("b"));   // independent key
         now[0] += 1500;
         assertEquals(0, l.tryAcquire("a"));
+    }
+
+    private IngestGuardFilter concurrencyFilter(int maxConcurrent) {
+        var props = new IngestProperties(1024, 500, maxConcurrent, new IngestProperties.RateLimit(false, 600, 100));
+        return new IngestGuardFilter(props, Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC), metrics);
+    }
+
+    private MockHttpServletResponse callWith(IngestGuardFilter f, jakarta.servlet.FilterChain chain) throws Exception {
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/ingest/hl7");
+        req.setRequestURI("/api/v1/ingest/hl7");
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        f.doFilter(req, res, chain);
+        return res;
+    }
+
+    @Test
+    void shedsLoadWithAFast503WhenTooManyRequestsAreInFlight() throws Exception {
+        var f = concurrencyFilter(1);
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var slow = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            try {
+                return callWith(f, (rq, rs) -> { entered.countDown(); try { release.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } });
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS));
+
+        var shed = call(f, "/api/v1/ingest/hl7", new byte[0]);          // the only permit is taken
+        assertEquals(503, shed.getStatus());
+        assertEquals("1", shed.getHeader("Retry-After"));
+        assertEquals(1.0, registry.counter(PipelineMetrics.INGEST_REJECTED, "reason", "overloaded").count());
+
+        release.countDown();
+        assertEquals(200, slow.get(5, java.util.concurrent.TimeUnit.SECONDS).getStatus());
+        assertEquals(200, call(f, "/api/v1/ingest/hl7", new byte[0]).getStatus()); // permit was returned
+    }
+
+    @Test
+    void aFailingRequestStillReturnsItsPermit() throws Exception {
+        var f = concurrencyFilter(1);
+        assertThrows(Exception.class, () -> callWith(f, (rq, rs) -> { throw new jakarta.servlet.ServletException("boom"); }));
+        assertEquals(200, call(f, "/api/v1/ingest/hl7", new byte[0]).getStatus());
+    }
+
+    @Test
+    void defaultConcurrencyScalesWithCpusWithAFloorOfFour() {
+        var p = new IngestProperties(0, 0, 0, null);
+        assertTrue(p.maxConcurrent() >= 4);
+        assertEquals(7, new IngestProperties(0, 0, 7, null).maxConcurrent());
     }
 }
