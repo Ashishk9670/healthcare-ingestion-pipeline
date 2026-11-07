@@ -49,6 +49,7 @@ jobs:
           IMAGE: ghcr.io/${{ github.repository }}
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
+          IMAGE="${IMAGE,,}"   # OCI image references must be lowercase; github.repository keeps the owner's capitalisation (Ashishk9670)
           cosign sign --yes "${IMAGE}@${DIGEST}"
           cosign attest --yes --type cyclonedx --predicate target/bom.json "${IMAGE}@${DIGEST}"
       - name: GitHub release
